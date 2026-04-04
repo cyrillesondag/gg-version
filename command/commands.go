@@ -54,7 +54,7 @@ func Run() error {
 				Flags: []cli.Flag{
 					&cli.StringSliceFlag{
 						Name:  "var",
-						Usage: "extra template variable as name=value (repeatable)",
+						Usage: "extra template variable as name=value (accepted for CLI uniformity, has no effect on last)",
 					},
 				},
 				Action: lastCmd,

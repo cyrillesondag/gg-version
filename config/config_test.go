@@ -34,7 +34,7 @@ semver:
       release: true
     - pattern: ".*"
       release: false
-      format: "{{ .LastTag }}-dev.{{ .CommitCount }}"
+      format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".gg-version.yaml")
@@ -61,7 +61,7 @@ semver:
 	if cfg.Semver.Branches[1].Release {
 		t.Fatal("expected second branch to be pre-release")
 	}
-	if cfg.Semver.Branches[1].Format != "{{ .LastTag }}-dev.{{ .CommitCount }}" {
+	if cfg.Semver.Branches[1].Format != "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}" {
 		t.Fatalf("unexpected format: %s", cfg.Semver.Branches[1].Format)
 	}
 }
