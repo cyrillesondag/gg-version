@@ -1,0 +1,38 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-04-semver-strategy.md",
+  "tasks": [
+    {
+      "id": 6,
+      "subject": "Task 1: Decouple VersionFormat from git.Project",
+      "status": "pending",
+      "description": "**Goal:** Supprimer Format de Project, passer VersionFormat en paramètre à LastTag(), ajouter IsHeadTagged(), NewProjectFromRepo(), corriger les retours d'erreur.\n\n**Files:**\n- Modify: `git/git.go`\n- Modify: `git/git_test.go`\n\n**Acceptance Criteria:**\n- [ ] Project struct sans champ Format\n- [ ] NewProject(path, sha string) — deux params\n- [ ] LastTag(f format.VersionFormat) accepte format en param\n- [ ] IsHeadTagged(tag string) (bool, error) ajouté\n- [ ] NewProjectFromRepo(repo, hash) ajouté\n- [ ] go test ./git/ -v → PASS\n\n**Verify:** `go test ./git/ -v` → all PASS\n\n```json:metadata\n{\"files\": [\"git/git.go\", \"git/git_test.go\"], \"verifyCommand\": \"go test ./git/ -v\", \"acceptanceCriteria\": [\"Project struct sans Format\", \"LastTag accepte VersionFormat param\", \"IsHeadTagged ajouté\", \"NewProjectFromRepo ajouté\", \"tous les tests passent\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 2: Create config package",
+      "status": "pending",
+      "description": "**Goal:** Parser .gg-version.yaml vers Config struct, retourner DefaultConfig si fichier absent.\n\n**Files:**\n- Create: `config/config.go`\n- Create: `config/config_test.go`\n\n**Acceptance Criteria:**\n- [ ] Load() retourne DefaultConfig si fichier absent\n- [ ] Load() parse correctement un YAML valide\n- [ ] DefaultConfig() retourne initial=0.1.0 et un pattern catch-all\n- [ ] go test ./config/ -v → PASS\n\n**Verify:** `go test ./config/ -v` → all PASS\n\n```json:metadata\n{\"files\": [\"config/config.go\", \"config/config_test.go\"], \"verifyCommand\": \"go test ./config/ -v\", \"acceptanceCriteria\": [\"Load retourne DefaultConfig si fichier absent\", \"Parse YAML valide\", \"DefaultConfig avec valeurs par défaut\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 3: SemverFormat with constraints",
+      "status": "pending",
+      "description": "**Goal:** Implémenter SemverFormat dans strategy/semver avec Prefix et Constraints (major/minor/patch).\n\n**Files:**\n- Create: `strategy/semver/semver.go` (SemverFormat uniquement)\n- Create: `strategy/semver/semver_test.go` (tests format)\n\n**Acceptance Criteria:**\n- [ ] IsValid valide semver de base\n- [ ] Prefix \"v\" accepte \"v1.0.0\" et rejette \"1.0.0\"\n- [ ] Constraint major=1 rejette \"2.0.0\"\n- [ ] Constraints major=1+minor=2 rejette \"1.3.0\"\n- [ ] SemverFormat implémente format.VersionFormat (compile-time check)\n- [ ] go test ./strategy/semver/ -v → PASS\n\n**Verify:** `go test ./strategy/semver/ -v` → all PASS\n\n```json:metadata\n{\"files\": [\"strategy/semver/semver.go\", \"strategy/semver/semver_test.go\"], \"verifyCommand\": \"go test ./strategy/semver/ -v\", \"acceptanceCriteria\": [\"IsValid basique\", \"Prefix support\", \"Constraints major/minor/patch\", \"interface check\"]}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 4: Strategy — Last() and Current()",
+      "status": "pending",
+      "blockedBy": [6, 7, 8],
+      "description": "**Goal:** Ajouter Strategy avec Last() et Current() dans strategy/semver, avec interface GitProject et tests in-memory.\n\n**Files:**\n- Modify: `strategy/semver/semver.go` (ajouter Strategy, GitProject interface)\n- Modify: `strategy/semver/semver_test.go` (ajouter tests strategy)\n- Modify: `git/git.go` (ajouter NewProjectFromRepo)\n\n**Acceptance Criteria:**\n- [ ] Last() retourne Initial quand pas de tag\n- [ ] Last() retourne le dernier tag valide\n- [ ] Last() respecte les contraintes major du pattern de branche\n- [ ] Current() retourne le tag exact si HEAD est tagué\n- [ ] Current() retourne le dernier tag sur branche release non taguée\n- [ ] Current() retourne version formatée sur branche pre-release\n- [ ] go test ./git/ ./strategy/semver/ -v → PASS\n\n**Verify:** `go test ./git/ ./strategy/semver/ -v` → all PASS\n\n```json:metadata\n{\"files\": [\"strategy/semver/semver.go\", \"strategy/semver/semver_test.go\", \"git/git.go\"], \"verifyCommand\": \"go test ./git/ ./strategy/semver/ -v\", \"acceptanceCriteria\": [\"Last retourne initial\", \"Last retourne dernier tag\", \"contraintes de branche\", \"Current HEAD tagué\", \"Current release branch\", \"Current pre-release formaté\"]}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 5: Wire CLI — current and last commands",
+      "status": "pending",
+      "blockedBy": [9],
+      "description": "**Goal:** Câbler les commandes current et last dans command/commands.go, ajouter --repo flag, supprimer format/semver.go.\n\n**Files:**\n- Modify: `command/commands.go`\n- Modify: `git/git_test.go` (update import pour SemverFormat)\n- Delete: `format/semver.go`\n\n**Acceptance Criteria:**\n- [ ] gg-version current imprime la version et exit 0\n- [ ] gg-version last imprime le dernier tag et exit 0\n- [ ] --repo flag fonctionne (défaut \".\")\n- [ ] --config flag fonctionne (défaut \".gg-version.yml\")\n- [ ] go build ./... → succès\n- [ ] go test ./... → all PASS\n\n**Verify:** `go build ./... && go test ./...` → PASS\n\n```json:metadata\n{\"files\": [\"command/commands.go\", \"git/git_test.go\", \"format/semver.go\"], \"verifyCommand\": \"go build ./... && go test ./...\", \"acceptanceCriteria\": [\"current command\", \"last command\", \"--repo flag\", \"--config flag\", \"build clean\", \"all tests pass\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-04T00:00:00Z"
+}
