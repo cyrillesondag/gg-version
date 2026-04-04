@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v3"
+	"gopkg.in/yaml.v3"
 
 	"gover/config"
 	gitpkg "gover/git"
@@ -74,6 +75,18 @@ func Run() error {
 					},
 				},
 				Action: envCmd,
+			},
+			{
+				Name:  "config",
+				Usage: "print the effective configuration",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "format",
+						Value: "yaml",
+						Usage: "output format: yaml or json",
+					},
+				},
+				Action: configCmd,
 			},
 		},
 	}
@@ -151,6 +164,54 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return printVars(vars, cmd.String("format"))
+}
+
+func configCmd(ctx context.Context, cmd *cli.Command) error {
+	format := cmd.String("format")
+	if format != "yaml" && format != "json" {
+		return fmt.Errorf("unknown format %q: must be yaml or json", format)
+	}
+
+	// Detect source: does the config file exist on disk?
+	source := configPath
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		source = "default"
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if format == "json" {
+		out := struct {
+			Source string             `json:"_source"`
+			Semver config.SemverConfig `json:"semver"`
+		}{
+			Source: source,
+			Semver: cfg.Semver,
+		}
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshaling config to JSON: %w", err)
+		}
+		fmt.Println(string(b))
+		return nil
+	}
+
+	// YAML (default)
+	b, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshaling config to YAML: %w", err)
+	}
+	var comment string
+	if source == "default" {
+		comment = "# default config\n"
+	} else {
+		comment = fmt.Sprintf("# config from: %s\n", source)
+	}
+	fmt.Print(comment + string(b))
+	return nil
 }
 
 // parseVarFlags parses a slice of "name=value" strings into a map.
