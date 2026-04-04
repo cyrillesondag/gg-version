@@ -34,7 +34,7 @@ func DefaultConfig() Config {
 				{
 					Pattern: ".*",
 					Release: false,
-					Format:  "{{ .LastTag }}-{{ .Branch }}.{{ .CommitCount }}",
+					Format:  "{{ .semver.LastTag }}-{{ .git.Branch }}.{{ .semver.CommitCount }}",
 				},
 			},
 		},

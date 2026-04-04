@@ -122,12 +122,89 @@ func (s Strategy) Last(p GitProject) (string, error) {
 	return tag, nil
 }
 
+// Vars returns all template variables as a nested map, grouped by namespace:
+//   - "semver": LastTag, CommitCount, ShortHash
+//   - "git":    Branch (short name, without refs/heads/)
+//   - "regex":  named captures from the matching branch pattern
+//   - "var":    key=value pairs from extra
+func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
+	branchName, err := p.BranchName()
+	if err != nil {
+		return nil, fmt.Errorf("getting branch name: %w", err)
+	}
+
+	_, captures := s.matchBranch(branchName)
+	constraints := versionConstraints(captures)
+	f := NewSemverFormat(s.cfg.TagPrefix, constraints)
+
+	lastTag, err := p.LastTag(f)
+	if err != nil {
+		return nil, err
+	}
+
+	effectiveLastTag := lastTag
+	if lastTag == "0.0.0" {
+		effectiveLastTag = s.cfg.Initial
+	}
+
+	commitCount := 0
+	if lastTag != "0.0.0" {
+		tagged, err := p.IsHeadTagged(lastTag)
+		if err != nil {
+			return nil, err
+		}
+		if !tagged {
+			commits, err := p.CommitSinceTag(lastTag)
+			if err != nil {
+				return nil, err
+			}
+			commitCount = len(commits) - 1
+		}
+	}
+
+	commitHashFull, err := p.CommitHash()
+	if err != nil {
+		return nil, err
+	}
+	shortHash := commitHashFull
+	if len(shortHash) > 7 {
+		shortHash = shortHash[:7]
+	}
+
+	shortBranch := strings.TrimPrefix(branchName, "refs/heads/")
+
+	regexVars := map[string]interface{}{}
+	for k, v := range captures {
+		regexVars[k] = v
+	}
+
+	varVars := map[string]interface{}{}
+	for k, v := range extra {
+		varVars[k] = v
+	}
+
+	return map[string]interface{}{
+		"semver": map[string]interface{}{
+			"LastTag":     effectiveLastTag,
+			"CommitCount": commitCount,
+			"ShortHash":   shortHash,
+		},
+		"git": map[string]interface{}{
+			"Branch": shortBranch,
+		},
+		"regex": regexVars,
+		"var":   varVars,
+	}, nil
+}
+
 // Current returns the version at HEAD:
 //   - Exact tag if HEAD is a tagged commit
 //   - Last tag if on a release branch (untagged HEAD)
 //   - Rendered format template if on a pre-release branch
 //   - cfg.Initial if no tag exists at all
-func (s Strategy) Current(p GitProject) (string, error) {
+//
+// extra is a map of key=value pairs injected into the "var" template namespace.
+func (s Strategy) Current(p GitProject, extra map[string]string) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", fmt.Errorf("getting branch name: %w", err)
@@ -142,12 +219,10 @@ func (s Strategy) Current(p GitProject) (string, error) {
 		return "", err
 	}
 
-	// No tag found at all
 	if lastTag == "0.0.0" {
 		return s.cfg.Initial, nil
 	}
 
-	// Check if HEAD is the tagged commit
 	tagged, err := p.IsHeadTagged(lastTag)
 	if err != nil {
 		return "", err
@@ -156,39 +231,15 @@ func (s Strategy) Current(p GitProject) (string, error) {
 		return lastTag, nil
 	}
 
-	// Release branch: return last tag as-is
 	if branchCfg.Release {
 		return lastTag, nil
 	}
 
-	// Pre-release branch: render the format template
-	commits, err := p.CommitSinceTag(lastTag)
+	// Pre-release branch: build vars and render template
+	vars, err := s.Vars(p, extra)
 	if err != nil {
 		return "", err
 	}
-	commitCount := len(commits) - 1 // exclude the tagged commit itself
-
-	shortBranch := strings.TrimPrefix(branchName, "refs/heads/")
-	commitHash, err := p.CommitHash()
-	if err != nil {
-		return "", err
-	}
-	shortHash := commitHash
-	if len(shortHash) > 7 {
-		shortHash = shortHash[:7]
-	}
-
-	vars := map[string]interface{}{
-		"LastTag":     lastTag,
-		"Branch":      shortBranch,
-		"CommitCount": commitCount,
-		"ShortHash":   shortHash,
-	}
-	// Merge named captures from the branch pattern into template vars
-	for k, v := range captures {
-		vars[k] = v
-	}
-
 	return renderTemplate(branchCfg.Format, vars)
 }
 
@@ -215,7 +266,7 @@ func (s Strategy) matchBranch(branchName string) (config.BranchConfig, map[strin
 	}
 	return config.BranchConfig{
 		Release: false,
-		Format:  "{{ .LastTag }}-{{ .Branch }}.{{ .CommitCount }}",
+		Format:  "{{ .semver.LastTag }}-{{ .git.Branch }}.{{ .semver.CommitCount }}",
 	}, map[string]string{}
 }
 

@@ -209,7 +209,7 @@ func mainConfig() config.SemverConfig {
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
 			{Pattern: "^refs/heads/main$", Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .LastTag }}-{{ .Branch }}.{{ .CommitCount }}"},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-{{ .git.Branch }}.{{ .semver.CommitCount }}"},
 		},
 	}
 }
@@ -258,7 +258,7 @@ func TestLastRespectsMajorConstraint(t *testing.T) {
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
 			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`, Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .LastTag }}-dev.{{ .CommitCount }}"},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/release/1.x")
@@ -279,7 +279,7 @@ func TestCurrentReturnsTagWhenHeadIsTagged(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
-	got, err := s.Current(p)
+	got, err := s.Current(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestCurrentReturnsLastTagOnReleaseBranchUntagged(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
-	got, err := s.Current(p)
+	got, err := s.Current(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestCurrentReturnsFormattedVersionOnPreReleaseBranch(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/feature/my-feat")
 	s := semverstrategy.NewStrategy(mainConfig())
 
-	got, err := s.Current(p)
+	got, err := s.Current(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,11 +328,106 @@ func TestCurrentReturnsInitialWhenNoTag(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
-	got, err := s.Current(p)
+	got, err := s.Current(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != "0.1.0" {
 		t.Fatalf("expected 0.1.0, got %s", got)
+	}
+}
+
+// ── Vars tests ────────────────────────────────────────────────────────────────
+
+func TestVars_semverNamespace(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.2.3")
+	createCommit(t, repo)
+	createCommit(t, repo)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	semverVars, ok := vars["semver"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"semver\"] to be a map")
+	}
+	if semverVars["LastTag"] != "1.2.3" {
+		t.Errorf("expected LastTag 1.2.3, got %v", semverVars["LastTag"])
+	}
+	if semverVars["CommitCount"] != 2 {
+		t.Errorf("expected CommitCount 2, got %v", semverVars["CommitCount"])
+	}
+	hash, ok := semverVars["ShortHash"].(string)
+	if !ok || len(hash) != 7 {
+		t.Errorf("expected ShortHash to be a 7-char string, got %v", semverVars["ShortHash"])
+	}
+}
+
+func TestVars_gitNamespace(t *testing.T) {
+	repo := newRepo(t)
+	p := newFakeProject(t, repo, "refs/heads/feature/foo")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitVars, ok := vars["git"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"git\"] to be a map")
+	}
+	if gitVars["Branch"] != "feature/foo" {
+		t.Errorf("expected Branch feature/foo, got %v", gitVars["Branch"])
+	}
+}
+
+func TestVars_regexNamespace(t *testing.T) {
+	repo := newRepo(t)
+	cfg := config.SemverConfig{
+		TagPrefix: "",
+		Initial:   "0.1.0",
+		Branches: []config.BranchConfig{
+			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`, Release: true},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"},
+		},
+	}
+	p := newFakeProject(t, repo, "refs/heads/release/1.x")
+	s := semverstrategy.NewStrategy(cfg)
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	regexVars, ok := vars["regex"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"regex\"] to be a map")
+	}
+	if regexVars["major"] != "1" {
+		t.Errorf("expected regex.major=1, got %v", regexVars["major"])
+	}
+}
+
+func TestVars_varNamespace(t *testing.T) {
+	repo := newRepo(t)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, map[string]string{"env": "prod", "team": "platform"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	varVars, ok := vars["var"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"var\"] to be a map")
+	}
+	if varVars["env"] != "prod" {
+		t.Errorf("expected var.env=prod, got %v", varVars["env"])
+	}
+	if varVars["team"] != "platform" {
+		t.Errorf("expected var.team=platform, got %v", varVars["team"])
 	}
 }
