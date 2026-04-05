@@ -431,3 +431,138 @@ func TestVars_varNamespace(t *testing.T) {
 		t.Errorf("expected var.team=platform, got %v", varVars["team"])
 	}
 }
+
+func TestVars_semverMajorMinorPatch(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.2.3")
+	createCommit(t, repo)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, ok := vars["semver"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"semver\"] to be a map")
+	}
+	if sv["Major"] != "1" {
+		t.Errorf("expected Major=1, got %v", sv["Major"])
+	}
+	if sv["Minor"] != "2" {
+		t.Errorf("expected Minor=2, got %v", sv["Minor"])
+	}
+	if sv["Patch"] != "3" {
+		t.Errorf("expected Patch=3, got %v", sv["Patch"])
+	}
+	if sv["PreRelease"] != "" {
+		t.Errorf("expected PreRelease empty, got %v", sv["PreRelease"])
+	}
+}
+
+func TestVars_semverPreRelease(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.2.3-rc.1")
+	createCommit(t, repo)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, ok := vars["semver"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"semver\"] to be a map")
+	}
+	if sv["PreRelease"] != "rc.1" {
+		t.Errorf("expected PreRelease=rc.1, got %v", sv["PreRelease"])
+	}
+}
+
+func TestVars_semverNoTag(t *testing.T) {
+	repo := newRepo(t)
+	// Pas de tag → fallback sur cfg.Initial = "0.1.0"
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, ok := vars["semver"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"semver\"] to be a map")
+	}
+	if sv["Major"] != "0" {
+		t.Errorf("expected Major=0 (from cfg.Initial 0.1.0), got %v", sv["Major"])
+	}
+	if sv["Minor"] != "1" {
+		t.Errorf("expected Minor=1 (from cfg.Initial 0.1.0), got %v", sv["Minor"])
+	}
+	if sv["Patch"] != "0" {
+		t.Errorf("expected Patch=0 (from cfg.Initial 0.1.0), got %v", sv["Patch"])
+	}
+	if sv["PreRelease"] != "" {
+		t.Errorf("expected PreRelease empty (from cfg.Initial 0.1.0), got %v", sv["PreRelease"])
+	}
+}
+
+func TestVars_semverParseFailure(t *testing.T) {
+	repo := newRepo(t)
+	// cfg.Initial is not a valid semver string — parse will fail
+	cfg := config.SemverConfig{
+		TagPrefix: "",
+		Initial:   "not-a-version",
+		Branches: []config.BranchConfig{
+			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"},
+		},
+	}
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(cfg)
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, ok := vars["semver"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"semver\"] to be a map")
+	}
+	if sv["Major"] != "" {
+		t.Errorf("expected Major empty on parse failure, got %v", sv["Major"])
+	}
+	if sv["Minor"] != "" {
+		t.Errorf("expected Minor empty on parse failure, got %v", sv["Minor"])
+	}
+	if sv["Patch"] != "" {
+		t.Errorf("expected Patch empty on parse failure, got %v", sv["Patch"])
+	}
+	if sv["PreRelease"] != "" {
+		t.Errorf("expected PreRelease empty on parse failure, got %v", sv["PreRelease"])
+	}
+}
+
+func TestVars_gitDate(t *testing.T) {
+	repo := newRepo(t)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	vars, err := s.Vars(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitVars, ok := vars["git"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected vars[\"git\"] to be a map")
+	}
+	date, ok := gitVars["Date"].(string)
+	if !ok {
+		t.Fatalf("expected git.Date to be a string, got %T", gitVars["Date"])
+	}
+	// Vérifie le format YYYY-MM-DD
+	if len(date) != 10 || date[4] != '-' || date[7] != '-' {
+		t.Errorf("expected git.Date in YYYY-MM-DD format, got %q", date)
+	}
+}

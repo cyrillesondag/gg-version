@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	gosemver "github.com/coreos/go-semver/semver"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -183,14 +184,32 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 		varVars[k] = v
 	}
 
+	// Parse semver components from lastTag (or cfg.Initial if no tag found)
+	versionToParse := strings.TrimPrefix(lastTag, s.cfg.TagPrefix)
+	if lastTag == "0.0.0" {
+		versionToParse = s.cfg.Initial
+	}
+	major, minor, patch, preRelease := "", "", "", ""
+	if sv, err := gosemver.NewVersion(versionToParse); err == nil {
+		major = strconv.FormatInt(sv.Major, 10)
+		minor = strconv.FormatInt(sv.Minor, 10)
+		patch = strconv.FormatInt(sv.Patch, 10)
+		preRelease = string(sv.PreRelease)
+	}
+
 	return map[string]interface{}{
 		"semver": map[string]interface{}{
 			"LastTag":     effectiveLastTag,
 			"CommitCount": commitCount,
 			"ShortHash":   shortHash,
+			"Major":       major,
+			"Minor":       minor,
+			"Patch":       patch,
+			"PreRelease":  preRelease,
 		},
 		"git": map[string]interface{}{
 			"Branch": shortBranch,
+			"Date":   time.Now().UTC().Format("2006-01-02"),
 		},
 		"regex": regexVars,
 		"var":   varVars,

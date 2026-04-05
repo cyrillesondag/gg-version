@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-05-semver-vars-enrichment.md",
+  "tasks": [
+    {
+      "id": 29,
+      "subject": "Task 1: Enrichir Vars() avec composants semver et git.Date",
+      "status": "completed",
+      "description": "**Goal:** Ajouter `semver.Major`, `semver.Minor`, `semver.Patch`, `semver.PreRelease` (strings) et `git.Date` (YYYY-MM-DD) dans la map retournée par `Strategy.Vars()`.\n\n**Files:**\n- Modify: `strategy/semver/semver.go`\n- Modify: `strategy/semver/semver_test.go`\n\n**Acceptance Criteria:**\n- [ ] `vars[\"semver\"][\"Major\"]` = `\"1\"` pour le tag `\"1.2.3\"`\n- [ ] `vars[\"semver\"][\"Minor\"]` = `\"2\"` pour le tag `\"1.2.3\"`\n- [ ] `vars[\"semver\"][\"Patch\"]` = `\"3\"` pour le tag `\"1.2.3\"`\n- [ ] `vars[\"semver\"][\"PreRelease\"]` = `\"\"` pour `\"1.2.3\"`, `\"rc.1\"` pour `\"1.2.3-rc.1\"`\n- [ ] Pas de tag → composants parsés depuis `cfg.Initial` (`\"0.1.0\"` → Major=\"0\", Minor=\"1\", Patch=\"0\")\n- [ ] Parse échoue → composants restent `\"\"`\n- [ ] `vars[\"git\"][\"Date\"]` est une string au format `YYYY-MM-DD`\n- [ ] `/usr/local/go/bin/go test ./strategy/semver/ -v` → PASS\n\n**Verify:** `/usr/local/go/bin/go test ./strategy/semver/ -v` → tous PASS\n\n```json:metadata\n{\"files\": [\"strategy/semver/semver.go\", \"strategy/semver/semver_test.go\"], \"verifyCommand\": \"/usr/local/go/bin/go test ./strategy/semver/ -v\", \"acceptanceCriteria\": [\"semver.Major/Minor/Patch/PreRelease strings dans Vars()\", \"git.Date YYYY-MM-DD dans Vars()\", \"fallback sur cfg.Initial si lastTag==0.0.0\", \"parse fail → champs vides\", \"4 nouveaux tests passent\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-05T12:00:00Z"
+}
