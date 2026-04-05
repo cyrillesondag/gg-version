@@ -11,10 +11,18 @@ type Config struct {
 	Semver SemverConfig `yaml:"semver"`
 }
 
+type ConventionalCommitsConfig struct {
+	Format string   `yaml:"format"`
+	Major  []string `yaml:"major"`
+	Minor  []string `yaml:"minor"`
+	Patch  []string `yaml:"patch"`
+}
+
 type SemverConfig struct {
-	TagPrefix string         `yaml:"tag_prefix"`
-	Initial   string         `yaml:"initial"`
-	Branches  []BranchConfig `yaml:"branches"`
+	TagPrefix           string                   `yaml:"tag_prefix"`
+	Initial             string                   `yaml:"initial"`
+	Branches            []BranchConfig           `yaml:"branches"`
+	ConventionalCommits ConventionalCommitsConfig `yaml:"conventional_commits"`
 }
 
 type BranchConfig struct {
@@ -32,10 +40,24 @@ func DefaultConfig() Config {
 			Initial:   "0.1.0",
 			Branches: []BranchConfig{
 				{
+					Pattern: "main",
+					Release: true,
+					Format:  "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
+				},
+				{
 					Pattern: ".*",
 					Release: false,
-					Format:  "{{ .semver.LastTag }}-{{ .git.Branch }}.{{ .semver.CommitCount }}",
+					Format:  "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
 				},
+			},
+			ConventionalCommits: ConventionalCommitsConfig{
+				Format: `^\w+(?:\(.+\))?!?:`,
+				Major: []string{
+					`^\w+(?:\(.+\))?!:`,
+					`BREAKING[- ]CHANGE:`,
+				},
+				Minor: []string{`^feat(?:\(.+\))?:`},
+				Patch: []string{`^fix(?:\(.+\))?:`},
 			},
 		},
 	}

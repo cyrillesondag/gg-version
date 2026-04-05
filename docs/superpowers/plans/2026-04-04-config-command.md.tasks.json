@@ -4,9 +4,9 @@
     {
       "id": 22,
       "subject": "Task 1: config subcommand",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Ajouter `gg-version [--config path] config [--format yaml|json]` qui affiche la configuration effective avec commentaire de source.\n\n**Files:**\n- Modify: `command/commands.go`\n\n**Acceptance Criteria:**\n- [ ] `gg-version config` affiche du YAML valide avec `# default config` en tête\n- [ ] `gg-version config --format json` affiche du JSON avec `\"_source\": \"default\"`\n- [ ] `gg-version --config .gg-version.yml config` affiche `# config from: .gg-version.yml`\n- [ ] `gg-version config --format xml` retourne une erreur `unknown format \"xml\"`\n- [ ] `/usr/local/go/bin/go build ./... && /usr/local/go/bin/go test ./...` → PASS\n\n**Verify:** `/usr/local/go/bin/go build ./... && /usr/local/go/bin/go test ./...` → PASS\n\n```json:metadata\n{\"files\": [\"command/commands.go\"], \"verifyCommand\": \"/usr/local/go/bin/go build ./... && /usr/local/go/bin/go test ./...\", \"acceptanceCriteria\": [\"config YAML avec commentaire source\", \"config JSON avec _source\", \"format inconnu retourne erreur\", \"build et tests passent\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-04-04T00:00:00Z"
+  "lastUpdated": "2026-04-04T12:30:00Z"
 }

@@ -124,8 +124,10 @@ func (s Strategy) Last(p GitProject) (string, error) {
 }
 
 // Vars returns all template variables as a nested map, grouped by namespace:
-//   - "semver": LastTag, CommitCount, ShortHash
-//   - "git":    Branch (short name, without refs/heads/)
+//   - "semver": Semver, Major, Minor, Patch, PreRelease (CC-calculated),
+//               LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
+//               IsBreakingChange, IsPreRelease, HasNonConventionalCommits
+//   - "git":    Branch, Date, LastTag, Hash, ShortHash, CommitCount
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
 func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
@@ -134,7 +136,7 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 		return nil, fmt.Errorf("getting branch name: %w", err)
 	}
 
-	_, captures := s.matchBranch(branchName)
+	branchCfg, captures := s.matchBranch(branchName)
 	constraints := versionConstraints(captures)
 	f := NewSemverFormat(s.cfg.TagPrefix, constraints)
 
@@ -148,6 +150,8 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 		effectiveLastTag = s.cfg.Initial
 	}
 
+	// Fetch commits since last tag (for CommitCount + CC analysis)
+	var commitsSinceTag []*object.Commit
 	commitCount := 0
 	if lastTag != "0.0.0" {
 		tagged, err := p.IsHeadTagged(lastTag)
@@ -155,14 +159,48 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 			return nil, err
 		}
 		if !tagged {
-			commits, err := p.CommitSinceTag(lastTag)
+			all, err := p.CommitSinceTag(lastTag)
 			if err != nil {
 				return nil, err
 			}
-			commitCount = len(commits) - 1
+			// all includes the tagged commit at index len-1; exclude it
+			if len(all) > 1 {
+				commitsSinceTag = all[:len(all)-1]
+			}
+			commitCount = len(commitsSinceTag)
 		}
 	}
 
+	// Conventional Commits bump analysis
+	bumpLevel := BumpNone
+	hasNonCC := false
+	if len(commitsSinceTag) > 0 {
+		bumpLevel, hasNonCC = AnalyzeBump(commitsSinceTag, s.cfg.ConventionalCommits)
+	}
+
+	// CC-calculated version (without prefix)
+	semverStr := BumpVersion(effectiveLastTag, s.cfg.TagPrefix, bumpLevel)
+
+	// Parse semver components for Semver (CC-calculated)
+	var nextMajor, nextMinor, nextPatch, nextPreRelease string
+	if sv, err := gosemver.NewVersion(semverStr); err == nil {
+		nextMajor = strconv.FormatInt(sv.Major, 10)
+		nextMinor = strconv.FormatInt(sv.Minor, 10)
+		nextPatch = strconv.FormatInt(sv.Patch, 10)
+		nextPreRelease = string(sv.PreRelease)
+	}
+
+	// Parse semver components for LastVersion (last tag stripped of prefix)
+	lastVersionStr := strings.TrimPrefix(effectiveLastTag, s.cfg.TagPrefix)
+	var lastMajor, lastMinor, lastPatch, lastPreRelease string
+	if sv, err := gosemver.NewVersion(lastVersionStr); err == nil {
+		lastMajor = strconv.FormatInt(sv.Major, 10)
+		lastMinor = strconv.FormatInt(sv.Minor, 10)
+		lastPatch = strconv.FormatInt(sv.Patch, 10)
+		lastPreRelease = string(sv.PreRelease)
+	}
+
+	// Git metadata
 	commitHashFull, err := p.CommitHash()
 	if err != nil {
 		return nil, err
@@ -171,45 +209,46 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 	if len(shortHash) > 7 {
 		shortHash = shortHash[:7]
 	}
-
 	shortBranch := strings.TrimPrefix(branchName, "refs/heads/")
+
+	// Raw git tag (empty string when no tag found)
+	rawLastTag := lastTag
+	if lastTag == "0.0.0" {
+		rawLastTag = ""
+	}
 
 	regexVars := map[string]interface{}{}
 	for k, v := range captures {
 		regexVars[k] = v
 	}
-
 	varVars := map[string]interface{}{}
 	for k, v := range extra {
 		varVars[k] = v
 	}
 
-	// Parse semver components from lastTag (or cfg.Initial if no tag found)
-	versionToParse := strings.TrimPrefix(lastTag, s.cfg.TagPrefix)
-	if lastTag == "0.0.0" {
-		versionToParse = s.cfg.Initial
-	}
-	major, minor, patch, preRelease := "", "", "", ""
-	if sv, err := gosemver.NewVersion(versionToParse); err == nil {
-		major = strconv.FormatInt(sv.Major, 10)
-		minor = strconv.FormatInt(sv.Minor, 10)
-		patch = strconv.FormatInt(sv.Patch, 10)
-		preRelease = string(sv.PreRelease)
-	}
-
 	return map[string]interface{}{
 		"semver": map[string]interface{}{
-			"LastTag":     effectiveLastTag,
-			"CommitCount": commitCount,
-			"ShortHash":   shortHash,
-			"Major":       major,
-			"Minor":       minor,
-			"Patch":       patch,
-			"PreRelease":  preRelease,
+			"Semver":                    semverStr,
+			"Major":                     nextMajor,
+			"Minor":                     nextMinor,
+			"Patch":                     nextPatch,
+			"PreRelease":                nextPreRelease,
+			"LastVersion":               lastVersionStr,
+			"LastMajor":                 lastMajor,
+			"LastMinor":                 lastMinor,
+			"LastPatch":                 lastPatch,
+			"LastPreRelease":            lastPreRelease,
+			"IsBreakingChange":          bumpLevel == BumpMajor,
+			"IsPreRelease":              !branchCfg.Release,
+			"HasNonConventionalCommits": hasNonCC,
 		},
 		"git": map[string]interface{}{
-			"Branch": shortBranch,
-			"Date":   time.Now().UTC().Format("2006-01-02"),
+			"Branch":      shortBranch,
+			"Date":        time.Now().UTC().Format("2006-01-02"),
+			"LastTag":     rawLastTag,
+			"Hash":        commitHashFull,
+			"ShortHash":   shortHash,
+			"CommitCount": commitCount,
 		},
 		"regex": regexVars,
 		"var":   varVars,
@@ -218,11 +257,9 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 
 // Current returns the version at HEAD:
 //   - Exact tag if HEAD is a tagged commit
-//   - Last tag if on a release branch (untagged HEAD)
-//   - Rendered format template if on a pre-release branch
 //   - cfg.Initial if no tag exists at all
-//
-// extra is a map of key=value pairs injected into the "var" template namespace.
+//   - CC-calculated version (with prefix) on a release branch with untagged HEAD
+//   - Rendered format template on a pre-release branch
 func (s Strategy) Current(p GitProject, extra map[string]string) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
@@ -250,15 +287,25 @@ func (s Strategy) Current(p GitProject, extra map[string]string) (string, error)
 		return lastTag, nil
 	}
 
-	if branchCfg.Release {
-		return lastTag, nil
-	}
-
-	// Pre-release branch: build vars and render template
 	vars, err := s.Vars(p, extra)
 	if err != nil {
 		return "", err
 	}
+
+	semverMap, ok := vars["semver"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("internal error: semver namespace missing from Vars output")
+	}
+
+	if branchCfg.Release {
+		// Return CC-calculated version with prefix (consistent with tag format)
+		semverStr, ok := semverMap["Semver"].(string)
+		if !ok {
+			return "", fmt.Errorf("internal error: semver.Semver is not a string")
+		}
+		return s.cfg.TagPrefix + semverStr, nil
+	}
+
 	return renderTemplate(branchCfg.Format, vars)
 }
 
@@ -285,7 +332,7 @@ func (s Strategy) matchBranch(branchName string) (config.BranchConfig, map[strin
 	}
 	return config.BranchConfig{
 		Release: false,
-		Format:  "{{ .semver.LastTag }}-{{ .git.Branch }}.{{ .semver.CommitCount }}",
+		Format:  "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
 	}, map[string]string{}
 }
 

@@ -209,7 +209,16 @@ func mainConfig() config.SemverConfig {
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
 			{Pattern: "^refs/heads/main$", Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-{{ .git.Branch }}.{{ .semver.CommitCount }}"},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+		},
+		ConventionalCommits: config.ConventionalCommitsConfig{
+			Format: `^\w+(?:\(.+\))?!?:`,
+			Major: []string{
+				`^\w+(?:\(.+\))?!:`,
+				`BREAKING[- ]CHANGE:`,
+			},
+			Minor: []string{`^feat(?:\(.+\))?:`},
+			Patch: []string{`^fix(?:\(.+\))?:`},
 		},
 	}
 }
@@ -258,7 +267,7 @@ func TestLastRespectsMajorConstraint(t *testing.T) {
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
 			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`, Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/release/1.x")
@@ -291,7 +300,7 @@ func TestCurrentReturnsTagWhenHeadIsTagged(t *testing.T) {
 func TestCurrentReturnsLastTagOnReleaseBranchUntagged(t *testing.T) {
 	repo := newRepo(t)
 	createTag(t, repo, "1.0.0")
-	createCommit(t, repo)
+	createCommit(t, repo) // non-CC → patch default → 1.0.1
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
@@ -299,8 +308,8 @@ func TestCurrentReturnsLastTagOnReleaseBranchUntagged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "1.0.0" {
-		t.Fatalf("expected 1.0.0 (release branch, untagged HEAD), got %s", got)
+	if got != "1.0.1" {
+		t.Fatalf("expected 1.0.1 (CC patch bump), got %s", got)
 	}
 }
 
@@ -316,8 +325,9 @@ func TestCurrentReturnsFormattedVersionOnPreReleaseBranch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 2 commits after tag, branch short name = "feature/my-feat"
-	expected := "1.0.0-feature/my-feat.2"
+	// 2 non-CC commits → patch bump → Semver=1.0.1
+	// template: {{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}
+	expected := "1.0.1-feature/my-feat.2"
 	if got != expected {
 		t.Fatalf("expected %s, got %s", expected, got)
 	}
@@ -355,15 +365,12 @@ func TestVars_semverNamespace(t *testing.T) {
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
-	if semverVars["LastTag"] != "1.2.3" {
-		t.Errorf("expected LastTag 1.2.3, got %v", semverVars["LastTag"])
+	// With 2 non-CC commits after tag 1.2.3 → patch bump → Semver = "1.2.4"
+	if semverVars["Semver"] != "1.2.4" {
+		t.Errorf("expected Semver 1.2.4, got %v", semverVars["Semver"])
 	}
-	if semverVars["CommitCount"] != 2 {
-		t.Errorf("expected CommitCount 2, got %v", semverVars["CommitCount"])
-	}
-	hash, ok := semverVars["ShortHash"].(string)
-	if !ok || len(hash) != 7 {
-		t.Errorf("expected ShortHash to be a 7-char string, got %v", semverVars["ShortHash"])
+	if semverVars["LastVersion"] != "1.2.3" {
+		t.Errorf("expected LastVersion 1.2.3, got %v", semverVars["LastVersion"])
 	}
 }
 
@@ -383,6 +390,24 @@ func TestVars_gitNamespace(t *testing.T) {
 	if gitVars["Branch"] != "feature/foo" {
 		t.Errorf("expected Branch feature/foo, got %v", gitVars["Branch"])
 	}
+	// Hash is a 40-char string
+	hash, ok := gitVars["Hash"].(string)
+	if !ok || len(hash) != 40 {
+		t.Errorf("expected Hash to be a 40-char string, got %v", gitVars["Hash"])
+	}
+	// ShortHash is 7 chars
+	shortHash, ok := gitVars["ShortHash"].(string)
+	if !ok || len(shortHash) != 7 {
+		t.Errorf("expected ShortHash to be a 7-char string, got %v", gitVars["ShortHash"])
+	}
+	// CommitCount is 0 (no tag, no commits since tag)
+	if gitVars["CommitCount"] != 0 {
+		t.Errorf("expected CommitCount 0, got %v", gitVars["CommitCount"])
+	}
+	// LastTag is empty string (no tag)
+	if gitVars["LastTag"] != "" {
+		t.Errorf("expected LastTag empty (no tag), got %v", gitVars["LastTag"])
+	}
 }
 
 func TestVars_regexNamespace(t *testing.T) {
@@ -392,7 +417,7 @@ func TestVars_regexNamespace(t *testing.T) {
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
 			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`, Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/release/1.x")
@@ -435,7 +460,7 @@ func TestVars_varNamespace(t *testing.T) {
 func TestVars_semverMajorMinorPatch(t *testing.T) {
 	repo := newRepo(t)
 	createTag(t, repo, "1.2.3")
-	createCommit(t, repo)
+	createCommit(t, repo) // non-CC → patch default
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
@@ -447,17 +472,31 @@ func TestVars_semverMajorMinorPatch(t *testing.T) {
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
+	// CC-calculated version: 1.2.3 + patch default → 1.2.4
 	if sv["Major"] != "1" {
 		t.Errorf("expected Major=1, got %v", sv["Major"])
 	}
 	if sv["Minor"] != "2" {
 		t.Errorf("expected Minor=2, got %v", sv["Minor"])
 	}
-	if sv["Patch"] != "3" {
-		t.Errorf("expected Patch=3, got %v", sv["Patch"])
+	if sv["Patch"] != "4" {
+		t.Errorf("expected Patch=4 (bumped from 3), got %v", sv["Patch"])
 	}
 	if sv["PreRelease"] != "" {
 		t.Errorf("expected PreRelease empty, got %v", sv["PreRelease"])
+	}
+	// Last tag components
+	if sv["LastVersion"] != "1.2.3" {
+		t.Errorf("expected LastVersion=1.2.3, got %v", sv["LastVersion"])
+	}
+	if sv["LastMajor"] != "1" {
+		t.Errorf("expected LastMajor=1, got %v", sv["LastMajor"])
+	}
+	if sv["LastMinor"] != "2" {
+		t.Errorf("expected LastMinor=2, got %v", sv["LastMinor"])
+	}
+	if sv["LastPatch"] != "3" {
+		t.Errorf("expected LastPatch=3, got %v", sv["LastPatch"])
 	}
 }
 
@@ -476,14 +515,18 @@ func TestVars_semverPreRelease(t *testing.T) {
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
-	if sv["PreRelease"] != "rc.1" {
-		t.Errorf("expected PreRelease=rc.1, got %v", sv["PreRelease"])
+	// CC version clears pre-release
+	if sv["PreRelease"] != "" {
+		t.Errorf("expected PreRelease empty for CC version, got %v", sv["PreRelease"])
+	}
+	// Last tag preserves pre-release
+	if sv["LastPreRelease"] != "rc.1" {
+		t.Errorf("expected LastPreRelease=rc.1, got %v", sv["LastPreRelease"])
 	}
 }
 
 func TestVars_semverNoTag(t *testing.T) {
 	repo := newRepo(t)
-	// Pas de tag → fallback sur cfg.Initial = "0.1.0"
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
@@ -495,17 +538,21 @@ func TestVars_semverNoTag(t *testing.T) {
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
+	// No tag → no CC analysis → Semver = cfg.Initial = "0.1.0"
+	if sv["Semver"] != "0.1.0" {
+		t.Errorf("expected Semver=0.1.0 (cfg.Initial), got %v", sv["Semver"])
+	}
 	if sv["Major"] != "0" {
-		t.Errorf("expected Major=0 (from cfg.Initial 0.1.0), got %v", sv["Major"])
+		t.Errorf("expected Major=0, got %v", sv["Major"])
 	}
 	if sv["Minor"] != "1" {
-		t.Errorf("expected Minor=1 (from cfg.Initial 0.1.0), got %v", sv["Minor"])
+		t.Errorf("expected Minor=1, got %v", sv["Minor"])
 	}
 	if sv["Patch"] != "0" {
-		t.Errorf("expected Patch=0 (from cfg.Initial 0.1.0), got %v", sv["Patch"])
+		t.Errorf("expected Patch=0, got %v", sv["Patch"])
 	}
 	if sv["PreRelease"] != "" {
-		t.Errorf("expected PreRelease empty (from cfg.Initial 0.1.0), got %v", sv["PreRelease"])
+		t.Errorf("expected PreRelease empty, got %v", sv["PreRelease"])
 	}
 }
 
@@ -516,7 +563,7 @@ func TestVars_semverParseFailure(t *testing.T) {
 		TagPrefix: "",
 		Initial:   "not-a-version",
 		Branches: []config.BranchConfig{
-			{Pattern: ".*", Release: false, Format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"},
+			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/main")
@@ -564,5 +611,77 @@ func TestVars_gitDate(t *testing.T) {
 	// Vérifie le format YYYY-MM-DD
 	if len(date) != 10 || date[4] != '-' || date[7] != '-' {
 		t.Errorf("expected git.Date in YYYY-MM-DD format, got %q", date)
+	}
+}
+
+// ── Conventional Commits integration tests ────────────────────────────────────
+
+func TestCurrent_releaseWithFeat(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.2.3")
+	// Create a feat commit
+	wt, _ := repo.Worktree()
+	f, _ := wt.Filesystem.Create("feat.txt")
+	_, _ = f.Write([]byte("feature"))
+	_, _ = wt.Add("feat.txt")
+	author := object.Signature{Name: "test", Email: "t@t.local", When: time.Now()}
+	_, _ = wt.Commit("feat: add new feature", &gogit.CommitOptions{
+		All: true, Author: &author, Committer: &author, AllowEmptyCommits: true,
+	})
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	got, err := s.Current(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "1.3.0" {
+		t.Fatalf("expected 1.3.0 (minor bump from feat:), got %s", got)
+	}
+}
+
+func TestCurrent_releaseWithBreaking(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.2.3")
+	wt, _ := repo.Worktree()
+	f, _ := wt.Filesystem.Create("break.txt")
+	_, _ = f.Write([]byte("breaking"))
+	_, _ = wt.Add("break.txt")
+	author := object.Signature{Name: "test", Email: "t@t.local", When: time.Now()}
+	_, _ = wt.Commit("feat!: remove old API", &gogit.CommitOptions{
+		All: true, Author: &author, Committer: &author, AllowEmptyCommits: true,
+	})
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	got, err := s.Current(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "2.0.0" {
+		t.Fatalf("expected 2.0.0 (major bump from feat!:), got %s", got)
+	}
+}
+
+func TestCurrent_releaseAllNone(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.2.3")
+	wt, _ := repo.Worktree()
+	f, _ := wt.Filesystem.Create("chore.txt")
+	_, _ = f.Write([]byte("chore"))
+	_, _ = wt.Add("chore.txt")
+	author := object.Signature{Name: "test", Email: "t@t.local", When: time.Now()}
+	_, _ = wt.Commit("chore: update deps", &gogit.CommitOptions{
+		All: true, Author: &author, Committer: &author, AllowEmptyCommits: true,
+	})
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	got, err := s.Current(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "1.2.3" {
+		t.Fatalf("expected 1.2.3 (no bump — all chore commits), got %s", got)
 	}
 }

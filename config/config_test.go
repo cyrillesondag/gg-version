@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gover/config"
@@ -76,5 +77,38 @@ func TestLoadInvalidYAML(t *testing.T) {
 	_, err := config.Load(path)
 	if err == nil {
 		t.Fatal("expected error for invalid YAML, got nil")
+	}
+}
+
+func TestDefaultConfig_conventionalCommits(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cc := cfg.Semver.ConventionalCommits
+	if cc.Format == "" {
+		t.Error("expected ConventionalCommits.Format to be set")
+	}
+	if len(cc.Major) == 0 {
+		t.Error("expected ConventionalCommits.Major to have at least one pattern")
+	}
+	if len(cc.Minor) == 0 {
+		t.Error("expected ConventionalCommits.Minor to have at least one pattern")
+	}
+	if len(cc.Patch) == 0 {
+		t.Error("expected ConventionalCommits.Patch to have at least one pattern")
+	}
+	foundExclamation := false
+	foundFooter := false
+	for _, p := range cc.Major {
+		if strings.Contains(p, "!") {
+			foundExclamation = true
+		}
+		if strings.Contains(p, "BREAKING") {
+			foundFooter = true
+		}
+	}
+	if !foundExclamation {
+		t.Error("expected Major patterns to include breaking change exclamation pattern")
+	}
+	if !foundFooter {
+		t.Error("expected Major patterns to include BREAKING CHANGE footer pattern")
 	}
 }
