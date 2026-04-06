@@ -393,6 +393,10 @@ func filterVarsResults(results []semverstrategy.ComponentVarsResult) []semverstr
 func printComponentResults(results []semverstrategy.ComponentResult) error {
 	filtered := filterComponentResults(results)
 
+	if componentFlag != "" && len(filtered) == 0 {
+		return fmt.Errorf("component %q not found in config", componentFlag)
+	}
+
 	if len(filtered) == 1 && filtered[0].Name == "" {
 		fmt.Println(filtered[0].Version)
 		return nil
