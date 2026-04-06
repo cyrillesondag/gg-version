@@ -68,6 +68,7 @@ func DefaultConfig() Config {
 				Patch: []string{`^fix(?:\(.+\))?:`},
 			},
 		},
+		Components: map[string]ComponentConfig{},
 	}
 }
 
