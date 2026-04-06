@@ -693,3 +693,134 @@ func TestCurrent_releaseAllNone(t *testing.T) {
 		t.Fatalf("expected 1.2.3 (no bump — all chore commits), got %s", got)
 	}
 }
+
+// ── AllCurrent / AllLast / AllVars tests ──────────────────────────────────────
+
+func twoComponentConfig() config.Config {
+	return config.Config{
+		Semver: config.SemverConfig{
+			TagPrefix: "v",
+			Initial:   "0.1.0",
+			Branches: []config.BranchConfig{
+				{Pattern: "^refs/heads/main$", Release: true},
+				{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+			},
+			ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+		},
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+			"web": {Path: "web/**"},
+		},
+	}
+}
+
+func TestAllCurrent_noComponents(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "v1.2.3")
+	createCommit(t, repo)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(mainConfig())
+
+	results, err := s.AllCurrent(p, nil, config.Config{Semver: mainConfig()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Name != "" {
+		t.Errorf("expected single unnamed result, got %v", results)
+	}
+}
+
+func TestAllCurrent_withComponents_order(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "v1.0.0")
+
+	p := newFakeProject(t, repo, "refs/heads/main")
+	cfg := twoComponentConfig()
+	s := semverstrategy.NewStrategy(cfg.Semver)
+
+	results, err := s.AllCurrent(p, nil, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+	if results[0].Name != "@root" {
+		t.Errorf("expected @root first, got %q", results[0].Name)
+	}
+	if results[1].Name != "api" {
+		t.Errorf("expected api second, got %q", results[1].Name)
+	}
+	if results[2].Name != "web" {
+		t.Errorf("expected web third, got %q", results[2].Name)
+	}
+}
+
+func TestAllLast_withComponents(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "v1.0.0")
+	createTag(t, repo, "api/v1.2.3")
+
+	p := newFakeProject(t, repo, "refs/heads/main")
+	cfg := twoComponentConfig()
+	s := semverstrategy.NewStrategy(cfg.Semver)
+
+	results, err := s.AllLast(p, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+	if results[0].Version != "v1.0.0" {
+		t.Errorf("expected @root=v1.0.0, got %q", results[0].Version)
+	}
+	if results[1].Version != "api/v1.2.3" {
+		t.Errorf("expected api=api/v1.2.3, got %q", results[1].Version)
+	}
+	if results[2].Version != "0.1.0" {
+		t.Errorf("expected web=0.1.0 (initial), got %q", results[2].Version)
+	}
+}
+
+func TestAllVars_withComponents(t *testing.T) {
+	repo := newRepo(t)
+	p := newFakeProject(t, repo, "refs/heads/main")
+	cfg := twoComponentConfig()
+	s := semverstrategy.NewStrategy(cfg.Semver)
+
+	results, err := s.AllVars(p, nil, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+	if results[0].Name != "@root" {
+		t.Errorf("expected @root first, got %q", results[0].Name)
+	}
+	for _, r := range results {
+		if _, ok := r.Vars["semver"]; !ok {
+			t.Errorf("expected semver namespace in vars for %q", r.Name)
+		}
+	}
+}
+
+func TestResolveTagPrefix(t *testing.T) {
+	cases := []struct {
+		name     string
+		comp     config.ComponentConfig
+		global   string
+		expected string
+	}{
+		{"api", config.ComponentConfig{Path: "api/**"}, "v", "api/v"},
+		{"web", config.ComponentConfig{Path: "web/**", TagScope: "my-web"}, "v", "my-web/v"},
+		{"svc", config.ComponentConfig{Path: "svc/**"}, "", "svc/"},
+	}
+	for _, tc := range cases {
+		got := semverstrategy.ResolveTagPrefix(tc.name, tc.comp, tc.global)
+		if got != tc.expected {
+			t.Errorf("ResolveTagPrefix(%q, ..., %q) = %q, want %q", tc.name, tc.global, got, tc.expected)
+		}
+	}
+}
