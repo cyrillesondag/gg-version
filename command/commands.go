@@ -197,6 +197,10 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 
 	filtered := filterVarsResults(allResults)
 
+	if componentFlag != "" && len(filtered) == 0 {
+		return fmt.Errorf("component %q not found in config", componentFlag)
+	}
+
 	// Single unnamed result (no components): plain vars output
 	if len(filtered) == 1 && filtered[0].Name == "" {
 		return printVars(filtered[0].Vars, format)
