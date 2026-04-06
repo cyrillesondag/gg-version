@@ -7,8 +7,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ComponentConfig struct {
+	Path     string `yaml:"path"`      // glob, ex: "api/**"
+	TagScope string `yaml:"tag_scope"` // optionnel, défaut = nom de la clé
+}
+
 type Config struct {
-	Semver SemverConfig `yaml:"semver"`
+	Semver     SemverConfig               `yaml:"semver"`
+	Components map[string]ComponentConfig `yaml:"components"`
 }
 
 type ConventionalCommitsConfig struct {
@@ -19,10 +25,12 @@ type ConventionalCommitsConfig struct {
 }
 
 type SemverConfig struct {
-	TagPrefix           string                   `yaml:"tag_prefix"`
-	Initial             string                   `yaml:"initial"`
-	Branches            []BranchConfig           `yaml:"branches"`
+	TagPrefix           string                    `yaml:"tag_prefix"`
+	Initial             string                    `yaml:"initial"`
+	Branches            []BranchConfig            `yaml:"branches"`
 	ConventionalCommits ConventionalCommitsConfig `yaml:"conventional_commits"`
+	IgnorePaths         []string                  `yaml:"ignore_paths"`
+	IgnoreCommits       []string                  `yaml:"ignore_commits"`
 }
 
 type BranchConfig struct {

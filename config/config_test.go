@@ -112,3 +112,90 @@ func TestDefaultConfig_conventionalCommits(t *testing.T) {
 		t.Error("expected Major patterns to include BREAKING CHANGE footer pattern")
 	}
 }
+
+func TestLoadComponents(t *testing.T) {
+	content := `
+semver:
+  tag_prefix: "v"
+  initial: "0.1.0"
+components:
+  api:
+    path: "api/**"
+  web:
+    path: "web/**"
+    tag_scope: "my-web"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".gg-version.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Components) != 2 {
+		t.Fatalf("expected 2 components, got %d", len(cfg.Components))
+	}
+	api, ok := cfg.Components["api"]
+	if !ok {
+		t.Fatal("expected component 'api'")
+	}
+	if api.Path != "api/**" {
+		t.Errorf("expected api.Path=api/**, got %q", api.Path)
+	}
+	if api.TagScope != "" {
+		t.Errorf("expected api.TagScope empty (default), got %q", api.TagScope)
+	}
+	web := cfg.Components["web"]
+	if web.TagScope != "my-web" {
+		t.Errorf("expected web.TagScope=my-web, got %q", web.TagScope)
+	}
+}
+
+func TestLoadIgnorePaths(t *testing.T) {
+	content := `
+semver:
+  tag_prefix: "v"
+  ignore_paths:
+    - "*.md"
+    - "docs/**"
+  ignore_commits:
+    - "abc1234"
+    - "deadbeef"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".gg-version.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Semver.IgnorePaths) != 2 {
+		t.Fatalf("expected 2 ignore_paths, got %d", len(cfg.Semver.IgnorePaths))
+	}
+	if cfg.Semver.IgnorePaths[0] != "*.md" {
+		t.Errorf("expected *.md, got %q", cfg.Semver.IgnorePaths[0])
+	}
+	if len(cfg.Semver.IgnoreCommits) != 2 {
+		t.Fatalf("expected 2 ignore_commits, got %d", len(cfg.Semver.IgnoreCommits))
+	}
+	if cfg.Semver.IgnoreCommits[0] != "abc1234" {
+		t.Errorf("expected abc1234, got %q", cfg.Semver.IgnoreCommits[0])
+	}
+}
+
+func TestDefaultConfig_noComponents(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if len(cfg.Components) != 0 {
+		t.Errorf("expected no components in DefaultConfig, got %d", len(cfg.Components))
+	}
+	if len(cfg.Semver.IgnorePaths) != 0 {
+		t.Errorf("expected empty IgnorePaths, got %v", cfg.Semver.IgnorePaths)
+	}
+	if len(cfg.Semver.IgnoreCommits) != 0 {
+		t.Errorf("expected empty IgnoreCommits, got %v", cfg.Semver.IgnoreCommits)
+	}
+}
