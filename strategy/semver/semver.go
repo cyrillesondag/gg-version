@@ -88,6 +88,7 @@ type GitProject interface {
 	CommitSinceTag(tag string) ([]*object.Commit, error)
 	BranchName() (string, error)
 	CommitHash() (string, error)
+	CommitFiles(c *object.Commit) ([]string, error)
 }
 
 // Strategy computes semver versions from the git history.

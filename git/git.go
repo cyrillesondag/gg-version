@@ -164,6 +164,32 @@ func (p Project) CommitHash() (string, error) {
 	return p.head.Hash.String(), nil
 }
 
+// CommitFiles returns the list of files changed in c relative to its first parent.
+// For the initial commit (no parent), returns all files in the tree.
+func (p Project) CommitFiles(c *object.Commit) ([]string, error) {
+	if c.NumParents() == 0 {
+		var files []string
+		iter, err := c.Files()
+		if err != nil {
+			return nil, fmt.Errorf("listing files for initial commit: %w", err)
+		}
+		err = iter.ForEach(func(f *object.File) error {
+			files = append(files, f.Name)
+			return nil
+		})
+		return files, err
+	}
+	stats, err := c.Stats()
+	if err != nil {
+		return nil, fmt.Errorf("getting commit stats: %w", err)
+	}
+	files := make([]string, 0, len(stats))
+	for _, s := range stats {
+		files = append(files, s.Name)
+	}
+	return files, nil
+}
+
 func getCommitFromTag(repo *git.Repository, tagRef *plumbing.Reference) (*object.Commit, error) {
 	obj, err := repo.TagObject(tagRef.Hash())
 	if err != nil {

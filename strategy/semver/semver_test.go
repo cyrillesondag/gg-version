@@ -201,6 +201,14 @@ func (fp *fakeProject) CommitSinceTag(tag string) ([]*object.Commit, error) {
 	return p.CommitSinceTag(tag)
 }
 
+func (fp *fakeProject) CommitFiles(c *object.Commit) ([]string, error) {
+	p, err := gitpkg.NewProjectFromRepo(fp.repo, fp.hash)
+	if err != nil {
+		return nil, err
+	}
+	return p.CommitFiles(c)
+}
+
 // ── Strategy config helpers ───────────────────────────────────────────────────
 
 func mainConfig() config.SemverConfig {

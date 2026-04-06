@@ -432,3 +432,87 @@ func TestIsHeadTaggedFalse(t *testing.T) {
 		t.Fatal("expected HEAD not to be tagged")
 	}
 }
+
+func TestCommitFiles_singleFile(t *testing.T) {
+	repo := newRepo(t) // initial commit crée "foo.txt"
+	// Créer un deuxième commit ajoutant "bar.txt"
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, _ := wt.Filesystem.Create("bar.txt")
+	_, _ = f.Write([]byte("bar"))
+	_ = f.Close()
+	_, _ = wt.Add("bar.txt")
+	author := object.Signature{Name: "test", Email: "t@t.local", When: time.Now()}
+	h, err := wt.Commit("add bar", &git.CommitOptions{
+		Author: &author, Committer: &author,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := repo.CommitObject(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := projectAtHead(t, repo)
+	files, err := p.CommitFiles(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0] != "bar.txt" {
+		t.Errorf("expected [bar.txt], got %v", files)
+	}
+}
+
+func TestCommitFiles_initialCommit(t *testing.T) {
+	// newRepo crée un commit initial avec "foo.txt"
+	repo := newRepo(t)
+	head, _ := repo.Head()
+	c, _ := repo.CommitObject(head.Hash())
+	p := projectAtHead(t, repo)
+	files, err := p.CommitFiles(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Le commit initial doit lister tous les fichiers
+	if len(files) == 0 {
+		t.Error("expected at least one file for initial commit")
+	}
+	found := false
+	for _, f := range files {
+		if f == "foo.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected foo.txt in initial commit files, got %v", files)
+	}
+}
+
+func TestCommitFiles_multipleFiles(t *testing.T) {
+	repo := newRepo(t)
+	wt, _ := repo.Worktree()
+	for _, name := range []string{"a.go", "b.go"} {
+		f, _ := wt.Filesystem.Create(name)
+		_, _ = f.Write([]byte("content"))
+		_ = f.Close()
+		_, _ = wt.Add(name)
+	}
+	author := object.Signature{Name: "test", Email: "t@t.local", When: time.Now()}
+	h, err := wt.Commit("add a and b", &git.CommitOptions{
+		Author: &author, Committer: &author,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := repo.CommitObject(h)
+	p := projectAtHead(t, repo)
+	files, err := p.CommitFiles(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Errorf("expected 2 files, got %v", files)
+	}
+}
