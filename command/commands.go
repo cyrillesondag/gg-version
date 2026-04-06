@@ -17,8 +17,10 @@ import (
 )
 
 var (
-	configPath string
-	repoPath   string
+	configPath    string
+	repoPath      string
+	componentFlag string
+	rootFlag      bool
 )
 
 func Run() error {
@@ -35,6 +37,16 @@ func Run() error {
 				Value:       ".",
 				Destination: &repoPath,
 				Usage:       "path to the git repository",
+			},
+			&cli.StringFlag{
+				Name:        "component",
+				Destination: &componentFlag,
+				Usage:       "filter output to a single component (use with components defined in config)",
+			},
+			&cli.BoolFlag{
+				Name:        "root",
+				Destination: &rootFlag,
+				Usage:       "show only the root version, ignoring components",
 			},
 		},
 		Commands: []*cli.Command{
@@ -88,6 +100,18 @@ func Run() error {
 				},
 				Action: configCmd,
 			},
+			{
+				Name:  "components",
+				Usage: "list components defined in the configuration",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "format",
+						Value: "plain",
+						Usage: "output format: plain or json",
+					},
+				},
+				Action: componentsCmd,
+			},
 		},
 	}
 
@@ -95,75 +119,124 @@ func Run() error {
 }
 
 func currentCmd(ctx context.Context, cmd *cli.Command) error {
+	if componentFlag != "" && rootFlag {
+		return fmt.Errorf("--component and --root are mutually exclusive")
+	}
+
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-
 	project, err := gitpkg.NewProject(repoPath, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
-
 	extra := parseVarFlags(cmd.StringSlice("var"))
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	version, err := strategy.Current(project, extra)
+
+	results, err := strategy.AllCurrent(project, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing current version: %w", err)
 	}
-
-	fmt.Println(version)
-	return nil
+	return printComponentResults(results)
 }
 
 func lastCmd(ctx context.Context, cmd *cli.Command) error {
+	if componentFlag != "" && rootFlag {
+		return fmt.Errorf("--component and --root are mutually exclusive")
+	}
+
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-
 	project, err := gitpkg.NewProject(repoPath, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
-
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	version, err := strategy.Last(project)
+
+	results, err := strategy.AllLast(project, cfg)
 	if err != nil {
 		return fmt.Errorf("computing last version: %w", err)
 	}
-
-	fmt.Println(version)
-	return nil
+	return printComponentResults(results)
 }
 
 func envCmd(ctx context.Context, cmd *cli.Command) error {
+	if componentFlag != "" && rootFlag {
+		return fmt.Errorf("--component and --root are mutually exclusive")
+	}
+
 	extra := parseVarFlags(cmd.StringSlice("var"))
+	format := cmd.String("format")
 
-	project, err := gitpkg.NewProject(".", "")
+	project, err := gitpkg.NewProject(repoPath, "")
+	cfg, cfgErr := config.Load(configPath)
 
-	var vars map[string]interface{}
-	if err != nil {
-		// Not a git repo: populate only var namespace, leave others empty
+	if err != nil || cfgErr != nil {
+		// Not a git repo or no config: populate only var namespace
 		varVars := map[string]interface{}{}
 		for k, v := range extra {
 			varVars[k] = v
 		}
-		vars = map[string]interface{}{
-			"semver": map[string]interface{}{"LastTag": "", "CommitCount": 0, "ShortHash": ""},
-			"git":    map[string]interface{}{"Branch": ""},
+		vars := map[string]interface{}{
+			"semver": map[string]interface{}{},
+			"git":    map[string]interface{}{},
 			"regex":  map[string]interface{}{},
 			"var":    varVars,
 		}
-	} else {
-		strategy := semverstrategy.NewStrategy(config.DefaultConfig().Semver)
-		vars, err = strategy.Vars(project, extra)
-		if err != nil {
-			return fmt.Errorf("computing vars: %w", err)
-		}
+		return printVars(vars, format)
 	}
 
-	return printVars(vars, cmd.String("format"))
+	strategy := semverstrategy.NewStrategy(cfg.Semver)
+	allResults, err := strategy.AllVars(project, extra, cfg)
+	if err != nil {
+		return fmt.Errorf("computing vars: %w", err)
+	}
+
+	filtered := filterVarsResults(allResults)
+
+	// Single unnamed result (no components): plain vars output
+	if len(filtered) == 1 && filtered[0].Name == "" {
+		return printVars(filtered[0].Vars, format)
+	}
+
+	if format == "json" {
+		out := map[string]interface{}{}
+		for _, r := range filtered {
+			out[r.Name] = r.Vars
+		}
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshaling vars to JSON: %w", err)
+		}
+		fmt.Println(string(b))
+		return nil
+	}
+
+	// plain multi-component: prefix each key with component name
+	for _, r := range filtered {
+		prefix := r.Name + "."
+		if r.Name == "" {
+			prefix = ""
+		}
+		for _, ns := range []string{"semver", "git", "regex", "var"} {
+			nsVars, ok := r.Vars[ns].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			keys := make([]string, 0, len(nsVars))
+			for k := range nsVars {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				fmt.Printf("%s%s.%s=%v\n", prefix, ns, k, nsVars[k])
+			}
+		}
+	}
+	return nil
 }
 
 func configCmd(ctx context.Context, cmd *cli.Command) error {
@@ -172,7 +245,6 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("unknown format %q: must be yaml or json", format)
 	}
 
-	// Detect source: does the config file exist on disk?
 	source := configPath
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		source = "default"
@@ -185,11 +257,13 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 
 	if format == "json" {
 		out := struct {
-			Source string             `json:"_source"`
-			Semver config.SemverConfig `json:"semver"`
+			Source     string                             `json:"_source"`
+			Semver     config.SemverConfig                `json:"semver"`
+			Components map[string]config.ComponentConfig  `json:"components,omitempty"`
 		}{
-			Source: source,
-			Semver: cfg.Semver,
+			Source:     source,
+			Semver:     cfg.Semver,
+			Components: cfg.Components,
 		}
 		b, err := json.MarshalIndent(out, "", "  ")
 		if err != nil {
@@ -199,7 +273,6 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	// YAML (default)
 	b, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshaling config to YAML: %w", err)
@@ -211,6 +284,128 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 		comment = fmt.Sprintf("# config from: %s\n", source)
 	}
 	fmt.Print(comment + string(b))
+	return nil
+}
+
+func componentsCmd(ctx context.Context, cmd *cli.Command) error {
+	format := cmd.String("format")
+	if format != "plain" && format != "json" {
+		return fmt.Errorf("unknown format %q: must be plain or json", format)
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Components) == 0 {
+		fmt.Println("(no components defined)")
+		return nil
+	}
+
+	type componentInfo struct {
+		Path       string `json:"path"`
+		TagScope   string `json:"tag_scope"`
+		TagPattern string `json:"tag_pattern"`
+	}
+	infoMap := map[string]componentInfo{}
+	names := make([]string, 0, len(cfg.Components))
+	for name := range cfg.Components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		comp := cfg.Components[name]
+		scope := comp.TagScope
+		if scope == "" {
+			scope = name
+		}
+		pattern := scope + "/" + cfg.Semver.TagPrefix + "*"
+		infoMap[name] = componentInfo{
+			Path:       comp.Path,
+			TagScope:   scope,
+			TagPattern: pattern,
+		}
+	}
+
+	if format == "json" {
+		b, err := json.MarshalIndent(infoMap, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshaling to JSON: %w", err)
+		}
+		fmt.Println(string(b))
+		return nil
+	}
+
+	for _, name := range names {
+		info := infoMap[name]
+		fmt.Printf("%-12s path=%-30s tag=%s\n", name, info.Path, info.TagPattern)
+	}
+	return nil
+}
+
+// filterComponentResults filters results based on --component and --root flags.
+func filterComponentResults(results []semverstrategy.ComponentResult) []semverstrategy.ComponentResult {
+	if rootFlag {
+		for _, r := range results {
+			if r.Name == "@root" || r.Name == "" {
+				return []semverstrategy.ComponentResult{r}
+			}
+		}
+		return results[:1]
+	}
+	if componentFlag != "" {
+		for _, r := range results {
+			if r.Name == componentFlag {
+				return []semverstrategy.ComponentResult{r}
+			}
+		}
+		return nil
+	}
+	return results
+}
+
+func filterVarsResults(results []semverstrategy.ComponentVarsResult) []semverstrategy.ComponentVarsResult {
+	if rootFlag {
+		for _, r := range results {
+			if r.Name == "@root" || r.Name == "" {
+				return []semverstrategy.ComponentVarsResult{r}
+			}
+		}
+		return results[:1]
+	}
+	if componentFlag != "" {
+		for _, r := range results {
+			if r.Name == componentFlag {
+				return []semverstrategy.ComponentVarsResult{r}
+			}
+		}
+		return nil
+	}
+	return results
+}
+
+// printComponentResults prints version results to stdout.
+// Single unnamed result (no components): prints version only.
+// Single result filtered by --component or --root: prints version only.
+// Multiple or named results: prints "name    version" per line.
+func printComponentResults(results []semverstrategy.ComponentResult) error {
+	filtered := filterComponentResults(results)
+
+	if len(filtered) == 1 && filtered[0].Name == "" {
+		fmt.Println(filtered[0].Version)
+		return nil
+	}
+
+	if len(filtered) == 1 && (componentFlag != "" || rootFlag) {
+		fmt.Println(filtered[0].Version)
+		return nil
+	}
+
+	for _, r := range filtered {
+		fmt.Printf("%-12s %s\n", r.Name, r.Version)
+	}
 	return nil
 }
 
@@ -239,7 +434,6 @@ func printVars(vars map[string]interface{}, format string) error {
 		fmt.Println(string(out))
 		return nil
 	}
-	// plain (default): one line per variable, format namespace.key=value
 	for _, ns := range []string{"semver", "git", "regex", "var"} {
 		nsVars, ok := vars[ns].(map[string]interface{})
 		if !ok {
