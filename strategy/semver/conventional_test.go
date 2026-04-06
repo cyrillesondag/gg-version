@@ -194,3 +194,118 @@ func TestBumpVersion_clearsPreRelease(t *testing.T) {
 		t.Errorf("expected 1.2.4 (pre-release cleared), got %s", got)
 	}
 }
+
+// fakeFiles retourne une fonction qui mappe SHA de commit → liste de fichiers.
+func fakeFiles(m map[string][]string) func(*object.Commit) ([]string, error) {
+	return func(c *object.Commit) ([]string, error) {
+		return m[c.Hash.String()], nil
+	}
+}
+
+func TestFilterCommits_includePath(t *testing.T) {
+	repo := newRepo(t)
+	c1 := makeCommit(t, repo, "feat: api change")
+	c2 := makeCommit(t, repo, "feat: web change")
+	fm := fakeFiles(map[string][]string{
+		c1.Hash.String(): {"api/handler.go"},
+		c2.Hash.String(): {"web/index.html"},
+	})
+	cfg := semverstrategy.FilterConfig{IncludePaths: []string{"api/**"}}
+	result := semverstrategy.FilterCommits([]*object.Commit{c1, c2}, fm, cfg)
+	if len(result) != 1 || result[0].Hash != c1.Hash {
+		t.Errorf("expected only api commit, got %d commits", len(result))
+	}
+}
+
+func TestFilterCommits_excludeAll(t *testing.T) {
+	repo := newRepo(t)
+	c := makeCommit(t, repo, "docs: update readme")
+	fm := fakeFiles(map[string][]string{
+		c.Hash.String(): {"README.md", "CHANGELOG.md"},
+	})
+	cfg := semverstrategy.FilterConfig{ExcludePaths: []string{"*.md"}}
+	result := semverstrategy.FilterCommits([]*object.Commit{c}, fm, cfg)
+	if len(result) != 0 {
+		t.Errorf("expected commit excluded (all files are *.md), got %d", len(result))
+	}
+}
+
+func TestFilterCommits_excludePartial(t *testing.T) {
+	repo := newRepo(t)
+	c := makeCommit(t, repo, "feat: api + readme")
+	fm := fakeFiles(map[string][]string{
+		c.Hash.String(): {"api/handler.go", "README.md"},
+	})
+	cfg := semverstrategy.FilterConfig{ExcludePaths: []string{"*.md"}}
+	result := semverstrategy.FilterCommits([]*object.Commit{c}, fm, cfg)
+	// api/handler.go ne matche pas *.md → commit inclus
+	if len(result) != 1 {
+		t.Errorf("expected commit included (not all files are *.md), got %d", len(result))
+	}
+}
+
+func TestFilterCommits_ignoreCommitSHA(t *testing.T) {
+	repo := newRepo(t)
+	c := makeCommit(t, repo, "fix: something")
+	fm := fakeFiles(map[string][]string{c.Hash.String(): {"api/x.go"}})
+	cfg := semverstrategy.FilterConfig{IgnoreCommits: []string{c.Hash.String()}}
+	result := semverstrategy.FilterCommits([]*object.Commit{c}, fm, cfg)
+	if len(result) != 0 {
+		t.Errorf("expected commit excluded by full SHA, got %d", len(result))
+	}
+}
+
+func TestFilterCommits_ignoreCommitShortSHA(t *testing.T) {
+	repo := newRepo(t)
+	c := makeCommit(t, repo, "fix: something")
+	shortSHA := c.Hash.String()[:7]
+	fm := fakeFiles(map[string][]string{c.Hash.String(): {"api/x.go"}})
+	cfg := semverstrategy.FilterConfig{IgnoreCommits: []string{shortSHA}}
+	result := semverstrategy.FilterCommits([]*object.Commit{c}, fm, cfg)
+	if len(result) != 0 {
+		t.Errorf("expected commit excluded by short SHA (%s), got %d", shortSHA, len(result))
+	}
+}
+
+func TestFilterCommits_rootExcludesComponents(t *testing.T) {
+	repo := newRepo(t)
+	// Commit qui touche UNIQUEMENT api/ → doit être exclu de @root
+	cOnlyApi := makeCommit(t, repo, "feat: api only")
+	// Commit qui touche api/ ET go.mod → doit être inclus dans @root
+	cApiAndRoot := makeCommit(t, repo, "feat: api + root")
+	fm := fakeFiles(map[string][]string{
+		cOnlyApi.Hash.String():    {"api/handler.go"},
+		cApiAndRoot.Hash.String(): {"api/handler.go", "go.mod"},
+	})
+	// @root exclut api/**
+	cfg := semverstrategy.FilterConfig{ExcludePaths: []string{"api/**"}}
+	result := semverstrategy.FilterCommits([]*object.Commit{cOnlyApi, cApiAndRoot}, fm, cfg)
+	if len(result) != 1 || result[0].Hash != cApiAndRoot.Hash {
+		t.Errorf("expected only cApiAndRoot in @root, got %d commits", len(result))
+	}
+}
+
+func TestFilterCommits_noFilter(t *testing.T) {
+	repo := newRepo(t)
+	c1 := makeCommit(t, repo, "fix: a")
+	c2 := makeCommit(t, repo, "fix: b")
+	fm := fakeFiles(map[string][]string{})
+	cfg := semverstrategy.FilterConfig{} // aucun filtre
+	result := semverstrategy.FilterCommits([]*object.Commit{c1, c2}, fm, cfg)
+	if len(result) != 2 {
+		t.Errorf("expected 2 commits with no filter, got %d", len(result))
+	}
+}
+
+func TestFilterCommits_globDoublestar(t *testing.T) {
+	repo := newRepo(t)
+	c := makeCommit(t, repo, "feat: nested")
+	fm := fakeFiles(map[string][]string{
+		c.Hash.String(): {"packages/api/handler.go"},
+	})
+	cfg := semverstrategy.FilterConfig{IncludePaths: []string{"packages/api/**"}}
+	result := semverstrategy.FilterCommits([]*object.Commit{c}, fm, cfg)
+	if len(result) != 1 {
+		t.Errorf("expected ** to match nested path, got %d", len(result))
+	}
+}

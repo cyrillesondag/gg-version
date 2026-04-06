@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	gosemver "github.com/coreos/go-semver/semver"
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"gover/config"
@@ -17,6 +18,102 @@ const (
 	BumpMinor = 2
 	BumpMajor = 3
 )
+
+// FilterConfig defines rules for including or excluding commits from CC analysis.
+type FilterConfig struct {
+	// IncludePaths: commit is included only if ≥1 modified file matches a pattern.
+	// Empty = no include filter (all commits pass).
+	IncludePaths []string
+	// ExcludePaths: commit is excluded if ALL modified files match ≥1 pattern.
+	ExcludePaths []string
+	// IgnoreCommits: SHA prefixes — commit excluded if its full SHA starts with any entry.
+	IgnoreCommits []string
+}
+
+// FilterCommits returns the subset of commits that pass the filter rules.
+// files is a function that returns the list of files modified by a commit.
+// Order of evaluation per commit:
+//  1. SHA matches an IgnoreCommits prefix → excluded
+//  2. IncludePaths defined AND no file matches → excluded
+//  3. ExcludePaths defined AND ALL files match → excluded
+//  4. Otherwise → included
+func FilterCommits(
+	commits []*object.Commit,
+	files func(*object.Commit) ([]string, error),
+	cfg FilterConfig,
+) []*object.Commit {
+	// fast path: no filter configured
+	if len(cfg.IncludePaths) == 0 && len(cfg.ExcludePaths) == 0 && len(cfg.IgnoreCommits) == 0 {
+		return commits
+	}
+
+	result := make([]*object.Commit, 0, len(commits))
+	for _, c := range commits {
+		if isIgnoredBySHA(c.Hash.String(), cfg.IgnoreCommits) {
+			continue
+		}
+
+		changedFiles, err := files(c)
+		if err != nil {
+			// on error, include conservatively
+			result = append(result, c)
+			continue
+		}
+
+		if len(cfg.IncludePaths) > 0 && !anyFileMatches(changedFiles, cfg.IncludePaths) {
+			continue
+		}
+
+		if len(cfg.ExcludePaths) > 0 && allFilesMatch(changedFiles, cfg.ExcludePaths) {
+			continue
+		}
+
+		result = append(result, c)
+	}
+	return result
+}
+
+func isIgnoredBySHA(sha string, ignoreList []string) bool {
+	for _, prefix := range ignoreList {
+		if strings.HasPrefix(sha, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// anyFileMatches returns true if at least one file matches at least one pattern.
+func anyFileMatches(files []string, patterns []string) bool {
+	for _, f := range files {
+		for _, p := range patterns {
+			if matched, _ := doublestar.Match(p, f); matched {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// allFilesMatch returns true if every file matches at least one pattern.
+// Returns false for empty file list.
+func allFilesMatch(files []string, patterns []string) bool {
+	if len(files) == 0 {
+		return false
+	}
+	for _, f := range files {
+		fileMatched := false
+		for _, p := range patterns {
+			if matched, _ := doublestar.Match(p, f); matched {
+				fileMatched = true
+				break
+			}
+		}
+		if !fileMatched {
+			return false
+		}
+	}
+	return true
+}
 
 // AnalyzeBump scans commits and returns:
 //   - level: 0=no bump, 1=patch, 2=minor, 3=major
