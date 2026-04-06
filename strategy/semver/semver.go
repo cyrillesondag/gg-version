@@ -132,6 +132,15 @@ func (s Strategy) Last(p GitProject) (string, error) {
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
 func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
+	return s.varsCore(p, extra, s.cfg.TagPrefix, FilterConfig{
+		ExcludePaths:  s.cfg.IgnorePaths,
+		IgnoreCommits: s.cfg.IgnoreCommits,
+	})
+}
+
+// varsCore is the parameterised implementation of Vars, allowing callers to
+// override the tag prefix and filter configuration (used by component methods).
+func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
@@ -139,7 +148,7 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 
 	branchCfg, captures := s.matchBranch(branchName)
 	constraints := versionConstraints(captures)
-	f := NewSemverFormat(s.cfg.TagPrefix, constraints)
+	f := NewSemverFormat(tagPrefix, constraints)
 
 	lastTag, err := p.LastTag(f)
 	if err != nil {
@@ -168,6 +177,8 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 			if len(all) > 1 {
 				commitsSinceTag = all[:len(all)-1]
 			}
+			// Apply filtering
+			commitsSinceTag = FilterCommits(commitsSinceTag, p.CommitFiles, filterCfg)
 			commitCount = len(commitsSinceTag)
 		}
 	}
@@ -180,7 +191,7 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 	}
 
 	// CC-calculated version (without prefix)
-	semverStr := BumpVersion(effectiveLastTag, s.cfg.TagPrefix, bumpLevel)
+	semverStr := BumpVersion(effectiveLastTag, tagPrefix, bumpLevel)
 
 	// Parse semver components for Semver (CC-calculated)
 	var nextMajor, nextMinor, nextPatch, nextPreRelease string
@@ -192,7 +203,7 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 	}
 
 	// Parse semver components for LastVersion (last tag stripped of prefix)
-	lastVersionStr := strings.TrimPrefix(effectiveLastTag, s.cfg.TagPrefix)
+	lastVersionStr := strings.TrimPrefix(effectiveLastTag, tagPrefix)
 	var lastMajor, lastMinor, lastPatch, lastPreRelease string
 	if sv, err := gosemver.NewVersion(lastVersionStr); err == nil {
 		lastMajor = strconv.FormatInt(sv.Major, 10)
