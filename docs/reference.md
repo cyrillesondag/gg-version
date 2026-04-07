@@ -84,6 +84,10 @@ gg-version next
 gg-version next --format json
 # "v1.5.0"
 
+# Avec variable de template
+gg-version --var env=staging next
+# (utilise {{ .var.env }} dans le template de format)
+
 # En monorepo — tous les composants avec version calculée
 gg-version next
 # @root        v2.2.0
@@ -94,6 +98,13 @@ gg-version next --format json
 #   "@root": "v2.2.0",
 #   "api": "v0.6.0"
 # }
+
+# Filtrer un composant
+gg-version next --component api
+# v0.6.0
+
+gg-version next --root
+# v2.2.0
 ```
 
 **Flags :**
