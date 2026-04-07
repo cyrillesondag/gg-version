@@ -516,3 +516,26 @@ func TestCommitFiles_multipleFiles(t *testing.T) {
 		t.Errorf("expected 2 files, got %v", files)
 	}
 }
+
+func TestCommitDate(t *testing.T) {
+	repo := newRepo(t)
+	p := projectAtHead(t, repo)
+	authorDate, committerDate, err := p.CommitDate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authorDate.IsZero() {
+		t.Error("expected non-zero AuthorDate")
+	}
+	if committerDate.IsZero() {
+		t.Error("expected non-zero CommitterDate")
+	}
+	// Appels répétés → dates identiques (reproductibilité)
+	authorDate2, committerDate2, _ := p.CommitDate()
+	if !authorDate.Equal(authorDate2) {
+		t.Error("CommitDate not reproducible: AuthorDate differs between calls")
+	}
+	if !committerDate.Equal(committerDate2) {
+		t.Error("CommitDate not reproducible: CommitterDate differs between calls")
+	}
+}

@@ -3,6 +3,7 @@ package git
 import (
 	"fmt"
 	"gover/format"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -162,6 +163,11 @@ func (p Project) BranchName() (string, error) {
 
 func (p Project) CommitHash() (string, error) {
 	return p.head.Hash.String(), nil
+}
+
+// CommitDate returns the author and committer timestamps of the HEAD commit.
+func (p Project) CommitDate() (time.Time, time.Time, error) {
+	return p.head.Author.When, p.head.Committer.When, nil
 }
 
 // CommitFiles returns the list of files changed in c relative to its first parent.

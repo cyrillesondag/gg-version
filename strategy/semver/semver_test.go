@@ -209,6 +209,11 @@ func (fp *fakeProject) CommitFiles(c *object.Commit) ([]string, error) {
 	return p.CommitFiles(c)
 }
 
+func (fp *fakeProject) CommitDate() (time.Time, time.Time, error) {
+	return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), nil
+}
+
 // ── Strategy config helpers ───────────────────────────────────────────────────
 
 func mainConfig() config.SemverConfig {
@@ -612,13 +617,28 @@ func TestVars_gitDate(t *testing.T) {
 	if !ok {
 		t.Fatal("expected vars[\"git\"] to be a map")
 	}
-	date, ok := gitVars["Date"].(string)
+	authorDate, ok := gitVars["AuthorDate"].(string)
 	if !ok {
-		t.Fatalf("expected git.Date to be a string, got %T", gitVars["Date"])
+		t.Fatalf("expected git.AuthorDate to be a string, got %T", gitVars["AuthorDate"])
 	}
 	// Vérifie le format YYYY-MM-DD
-	if len(date) != 10 || date[4] != '-' || date[7] != '-' {
-		t.Errorf("expected git.Date in YYYY-MM-DD format, got %q", date)
+	if len(authorDate) != 10 || authorDate[4] != '-' || authorDate[7] != '-' {
+		t.Errorf("expected git.AuthorDate in YYYY-MM-DD format, got %q", authorDate)
+	}
+	committerDate, ok := gitVars["CommitterDate"].(string)
+	if !ok {
+		t.Fatalf("expected git.CommitterDate to be a string, got %T", gitVars["CommitterDate"])
+	}
+	// Vérifie le format YYYY-MM-DD
+	if len(committerDate) != 10 || committerDate[4] != '-' || committerDate[7] != '-' {
+		t.Errorf("expected git.CommitterDate in YYYY-MM-DD format, got %q", committerDate)
+	}
+	// Les dates du stub sont fixes (2026-01-01 et 2026-01-02) → reproductibles
+	if authorDate != "2026-01-01" {
+		t.Errorf("expected git.AuthorDate=2026-01-01, got %q", authorDate)
+	}
+	if committerDate != "2026-01-02" {
+		t.Errorf("expected git.CommitterDate=2026-01-02, got %q", committerDate)
 	}
 }
 

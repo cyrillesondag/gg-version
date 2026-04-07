@@ -91,9 +91,10 @@ gg-version [global flags] env [--format plain|json]
 ```bash
 # Format par défaut (plain)
 gg-version env
+# git.AuthorDate=2026-04-06
 # git.Branch=main
 # git.CommitCount=5
-# git.Date=2026-04-06
+# git.CommitterDate=2026-04-06
 # git.Hash=abc1234def5678901234567890abcdef12345678
 # git.LastTag=v1.2.0
 # git.ShortHash=abc1234
@@ -339,7 +340,8 @@ Disponibles dans le champ `format` des branches et via `gg-version env`.
 | Variable | Type | Description |
 |---|---|---|
 | `git.Branch` | string | Nom de la branche courante |
-| `git.Date` | string | Date du jour au format `2006-01-02` |
+| `git.AuthorDate` | string | Date de l'auteur du commit HEAD (format `2006-01-02`) |
+| `git.CommitterDate` | string | Date du committer du commit HEAD (format `2006-01-02`) |
 | `git.LastTag` | string | Dernier tag trouvé (avec préfixe, ex : `v1.2.0`), vide si aucun |
 | `git.Hash` | string | Hash complet du commit HEAD |
 | `git.ShortHash` | string | 7 premiers caractères du hash |

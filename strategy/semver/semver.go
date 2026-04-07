@@ -89,6 +89,7 @@ type GitProject interface {
 	BranchName() (string, error)
 	CommitHash() (string, error)
 	CommitFiles(c *object.Commit) ([]string, error)
+	CommitDate() (time.Time, time.Time, error)
 }
 
 // Strategy computes semver versions from the git history.
@@ -223,6 +224,11 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 	}
 	shortBranch := strings.TrimPrefix(branchName, "refs/heads/")
 
+	authorDate, committerDate, err := p.CommitDate()
+	if err != nil {
+		return nil, fmt.Errorf("getting commit date: %w", err)
+	}
+
 	// Raw git tag (empty string when no tag found)
 	rawLastTag := lastTag
 	if lastTag == "0.0.0" {
@@ -255,12 +261,13 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 			"HasNonConventionalCommits": hasNonCC,
 		},
 		"git": map[string]interface{}{
-			"Branch":      shortBranch,
-			"Date":        time.Now().UTC().Format("2006-01-02"),
-			"LastTag":     rawLastTag,
-			"Hash":        commitHashFull,
-			"ShortHash":   shortHash,
-			"CommitCount": commitCount,
+			"Branch":        shortBranch,
+			"AuthorDate":    authorDate.UTC().Format("2006-01-02"),
+			"CommitterDate": committerDate.UTC().Format("2006-01-02"),
+			"LastTag":       rawLastTag,
+			"Hash":          commitHashFull,
+			"ShortHash":     shortHash,
+			"CommitCount":   commitCount,
 		},
 		"regex": regexVars,
 		"var":   varVars,
