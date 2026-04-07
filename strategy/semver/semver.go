@@ -129,7 +129,7 @@ func (s Strategy) Last(p GitProject) (string, error) {
 //   - "semver": Semver, Major, Minor, Patch, PreRelease (CC-calculated),
 //               LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
 //               IsBreakingChange, IsPreRelease, HasNonConventionalCommits
-//   - "git":    Branch, Date, LastTag, Hash, ShortHash, CommitCount
+//   - "git":    Branch, AuthorDate, CommitterDate, LastTag, Hash, ShortHash, CommitCount
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
 func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {

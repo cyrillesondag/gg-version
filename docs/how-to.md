@@ -52,7 +52,7 @@ gg-version current
 Autre exemple — inclure la date :
 
 ```yaml
-format: "{{ .semver.Semver }}-{{ .git.Date }}.{{ .git.CommitCount }}"
+format: "{{ .semver.Semver }}-{{ .git.AuthorDate }}.{{ .git.CommitCount }}"
 ```
 
 ```bash
@@ -296,9 +296,10 @@ gg-version env
 ```
 
 ```
+git.AuthorDate=2026-04-06
 git.Branch=main
 git.CommitCount=3
-git.Date=2026-04-06
+git.CommitterDate=2026-04-06
 git.Hash=abc1234def5678...
 git.LastTag=v1.2.0
 git.ShortHash=abc1234
