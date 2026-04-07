@@ -30,6 +30,10 @@ gg-version current
 gg-version current
 # (chaîne vide)
 
+# Avec variable de template
+gg-version --var env=prod current
+# (utilise {{ .var.env }} dans le template de format)
+
 # En monorepo — @root tagué, api non tagué
 gg-version current
 # @root        v2.1.0
@@ -40,6 +44,13 @@ gg-version current --format json
 #   "@root": "v2.1.0",
 #   "api": ""
 # }
+
+# Filtrer un composant
+gg-version current --component api
+# (vide si api non tagué)
+
+gg-version current --root
+# v2.1.0
 ```
 
 **Flags :**
@@ -72,6 +83,17 @@ gg-version next
 
 gg-version next --format json
 # "v1.5.0"
+
+# En monorepo — tous les composants avec version calculée
+gg-version next
+# @root        v2.2.0
+# api          v0.6.0
+
+gg-version next --format json
+# {
+#   "@root": "v2.2.0",
+#   "api": "v0.6.0"
+# }
 ```
 
 **Flags :**
