@@ -56,13 +56,27 @@ func Run(version string) error {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:   "current",
-				Usage:  "print the current version at HEAD",
+				Name:  "current",
+				Usage: "print the current version at HEAD",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "format",
+						Value: "plain",
+						Usage: "output format: plain or json",
+					},
+				},
 				Action: currentCmd,
 			},
 			{
-				Name:   "last",
-				Usage:  "print the last valid semver tag reachable from HEAD",
+				Name:  "last",
+				Usage: "print the last valid semver tag reachable from HEAD",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "format",
+						Value: "plain",
+						Usage: "output format: plain or json",
+					},
+				},
 				Action: lastCmd,
 			},
 			{
@@ -130,7 +144,7 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("computing current version: %w", err)
 	}
-	return printComponentResults(results)
+	return printComponentResults(results, cmd.String("format"))
 }
 
 func lastCmd(ctx context.Context, cmd *cli.Command) error {
@@ -152,7 +166,7 @@ func lastCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("computing last version: %w", err)
 	}
-	return printComponentResults(results)
+	return printComponentResults(results, cmd.String("format"))
 }
 
 func envCmd(ctx context.Context, cmd *cli.Command) error {
@@ -392,24 +406,46 @@ func filterVarsResults(results []semverstrategy.ComponentVarsResult) []semverstr
 	return results
 }
 
-// printComponentResults prints version results to stdout.
+// printComponentResults prints version results to stdout in the requested format.
 // Single unnamed result (no components): prints version only.
 // Single result filtered by --component or --root: prints version only.
-// Multiple or named results: prints "name    version" per line.
-func printComponentResults(results []semverstrategy.ComponentResult) error {
+// Multiple or named results: prints "name    version" per line (plain) or JSON object.
+func printComponentResults(results []semverstrategy.ComponentResult, format string) error {
+	if format != "plain" && format != "json" {
+		return fmt.Errorf("unknown format %q: must be plain or json", format)
+	}
+
 	filtered := filterComponentResults(results)
 
 	if componentFlag != "" && len(filtered) == 0 {
 		return fmt.Errorf("component %q not found in config", componentFlag)
 	}
 
-	if len(filtered) == 1 && filtered[0].Name == "" {
+	// Single version: non-monorepo (no name) or filtered by --component/--root
+	if len(filtered) == 1 && (filtered[0].Name == "" || componentFlag != "" || rootFlag) {
+		if format == "json" {
+			b, err := json.Marshal(filtered[0].Version)
+			if err != nil {
+				return fmt.Errorf("marshaling version to JSON: %w", err)
+			}
+			fmt.Println(string(b))
+			return nil
+		}
 		fmt.Println(filtered[0].Version)
 		return nil
 	}
 
-	if len(filtered) == 1 && (componentFlag != "" || rootFlag) {
-		fmt.Println(filtered[0].Version)
+	// Multiple named results (monorepo without filter)
+	if format == "json" {
+		out := make(map[string]string, len(filtered))
+		for _, r := range filtered {
+			out[r.Name] = r.Version
+		}
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshaling versions to JSON: %w", err)
+		}
+		fmt.Println(string(b))
 		return nil
 	}
 

@@ -41,6 +41,12 @@ gg-version current --root
 # v2.1.0
 ```
 
+**Flags :**
+
+| Flag | Défaut | Description |
+|---|---|---|
+| `--format <plain\|json>` | `plain` | Format de sortie |
+
 ---
 
 ### `last`
@@ -71,6 +77,12 @@ gg-version last
 gg-version last --component frontend
 # v2.9.0
 ```
+
+**Flags :**
+
+| Flag | Défaut | Description |
+|---|---|---|
+| `--format <plain\|json>` | `plain` | Format de sortie |
 
 ---
 
