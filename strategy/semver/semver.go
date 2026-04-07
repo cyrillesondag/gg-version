@@ -85,11 +85,12 @@ var _ format.VersionFormat = SemverFormat{}
 type GitProject interface {
 	LastTag(f format.VersionFormat) (string, error)
 	IsHeadTagged(tag string) (bool, error)
-	CommitSinceTag(tag string) ([]*object.Commit, error)
+	CommitSinceTag(tag string) ([]*object.Commit, bool, error)
 	BranchName() (string, error)
 	CommitHash() (string, error)
 	CommitFiles(c *object.Commit) ([]string, error)
 	CommitDate() (time.Time, time.Time, error)
+	IsShallow() bool
 }
 
 // Strategy computes semver versions from the git history.
@@ -129,7 +130,7 @@ func (s Strategy) Last(p GitProject) (string, error) {
 //   - "semver": Semver, Major, Minor, Patch, PreRelease (CC-calculated),
 //               LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
 //               IsBreakingChange, IsPreRelease, HasNonConventionalCommits
-//   - "git":    Branch, AuthorDate, CommitterDate, LastTag, Hash, ShortHash, CommitCount
+//   - "git":    Branch, AuthorDate, CommitterDate, LastTag, Hash, ShortHash, CommitCount, IsShallow, Truncated
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
 func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
@@ -164,16 +165,18 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 	// Fetch commits since last tag (for CommitCount + CC analysis)
 	var commitsSinceTag []*object.Commit
 	commitCount := 0
+	var isTruncated bool
 	if lastTag != "0.0.0" {
 		tagged, err := p.IsHeadTagged(lastTag)
 		if err != nil {
 			return nil, err
 		}
 		if !tagged {
-			all, err := p.CommitSinceTag(lastTag)
+			all, truncated, err := p.CommitSinceTag(lastTag)
 			if err != nil {
 				return nil, err
 			}
+			isTruncated = truncated
 			// all includes the tagged commit at index len-1; exclude it
 			if len(all) > 1 {
 				commitsSinceTag = all[:len(all)-1]
@@ -268,6 +271,8 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 			"Hash":          commitHashFull,
 			"ShortHash":     shortHash,
 			"CommitCount":   commitCount,
+			"IsShallow":     p.IsShallow(),
+			"Truncated":     isTruncated,
 		},
 		"regex": regexVars,
 		"var":   varVars,

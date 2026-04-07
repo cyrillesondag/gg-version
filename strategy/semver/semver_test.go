@@ -193,13 +193,15 @@ func (fp *fakeProject) IsHeadTagged(tag string) (bool, error) {
 	return p.IsHeadTagged(tag)
 }
 
-func (fp *fakeProject) CommitSinceTag(tag string) ([]*object.Commit, error) {
+func (fp *fakeProject) CommitSinceTag(tag string) ([]*object.Commit, bool, error) {
 	p, err := gitpkg.NewProjectFromRepo(fp.repo, fp.hash)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	return p.CommitSinceTag(tag)
 }
+
+func (fp *fakeProject) IsShallow() bool { return false }
 
 func (fp *fakeProject) CommitFiles(c *object.Commit) ([]string, error) {
 	p, err := gitpkg.NewProjectFromRepo(fp.repo, fp.hash)
