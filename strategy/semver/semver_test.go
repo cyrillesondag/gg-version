@@ -423,6 +423,12 @@ func TestVars_gitNamespace(t *testing.T) {
 	if gitVars["LastTag"] != "" {
 		t.Errorf("expected LastTag empty (no tag), got %v", gitVars["LastTag"])
 	}
+	if gitVars["IsShallow"] != false {
+		t.Errorf("expected IsShallow=false, got %v", gitVars["IsShallow"])
+	}
+	if gitVars["Truncated"] != false {
+		t.Errorf("expected Truncated=false, got %v", gitVars["Truncated"])
+	}
 }
 
 func TestVars_regexNamespace(t *testing.T) {
