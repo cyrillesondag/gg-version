@@ -136,33 +136,39 @@ func (p Project) IsHeadTagged(tag string) (bool, error) {
 	return p.head.Hash == tagCommit.Hash, nil
 }
 
-func (p Project) CommitSinceTag(tag string) ([]*object.Commit, error) {
+// CommitSinceTag returns all commits reachable from HEAD back to (and including)
+// the tagged commit. The bool truncated is true when the tag commit was not found
+// during traversal — this happens in shallow clones where the tag is beyond the
+// clone depth. In that case the returned commits are those that were traversable.
+func (p Project) CommitSinceTag(tag string) ([]*object.Commit, bool, error) {
 	ref, err := p.repo.Tag(tag)
 	if err != nil {
-		return nil, fmt.Errorf("tag %q not found: %w", tag, err)
+		return nil, false, fmt.Errorf("tag %q not found: %w", tag, err)
 	}
 
 	ancestor, err := getCommitFromTag(p.repo, ref)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	iter := object.NewCommitPreorderIter(p.head, nil, nil)
 	defer iter.Close()
 
+	found := false
 	var history []*object.Commit
 	err = iter.ForEach(func(c *object.Commit) error {
 		history = append(history, c)
 		if c.Hash == ancestor.Hash {
+			found = true
 			return storer.ErrStop
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return history, nil
+	return history, !found, nil
 }
 
 func (p Project) BranchName() (string, error) {
@@ -180,6 +186,14 @@ func (p Project) CommitHash() (string, error) {
 // CommitDate returns the author and committer timestamps of the HEAD commit.
 func (p Project) CommitDate() (time.Time, time.Time, error) {
 	return p.head.Author.When, p.head.Committer.When, nil
+}
+
+// IsShallow reports whether this repository is a shallow clone.
+// A shallow clone has one or more grafted commits (commits whose parents
+// were artificially cut by git clone --depth=N).
+func (p Project) IsShallow() bool {
+	hashes, err := p.repo.Storer.Shallow()
+	return err == nil && len(hashes) > 0
 }
 
 // CommitFiles returns the list of files changed in c relative to its first parent.

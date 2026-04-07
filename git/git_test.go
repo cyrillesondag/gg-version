@@ -381,7 +381,7 @@ func TestCommitSinceTagCount(t *testing.T) {
 	createCommit(t, repo)
 	p := projectAtHead(t, repo)
 
-	commits, err := p.CommitSinceTag("1.0.0")
+	commits, _, err := p.CommitSinceTag("1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestCommitSinceTagMessages(t *testing.T) {
 	headHash := createCommit(t, repo)
 	p := projectAtHead(t, repo)
 
-	commits, err := p.CommitSinceTag("1.0.0")
+	commits, _, err := p.CommitSinceTag("1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -661,6 +661,70 @@ func TestLastTag_tiebreaker(t *testing.T) {
 				t.Fatalf("expected 1.2.0 (highest semver), got %s", tag)
 			}
 		})
+	}
+}
+
+func TestIsShallow(t *testing.T) {
+	repo := newRepo(t)
+	p := projectAtHead(t, repo)
+
+	// Normal repo → false
+	if p.IsShallow() {
+		t.Error("expected non-shallow repo to return false")
+	}
+
+	// Set grafted commits → true
+	head, err := repo.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Storer.SetShallow([]plumbing.Hash{head.Hash()}); err != nil {
+		t.Fatal(err)
+	}
+	p2 := projectAtHead(t, repo)
+	if !p2.IsShallow() {
+		t.Error("expected shallow repo to return true")
+	}
+}
+
+func TestCommitSinceTag_truncated(t *testing.T) {
+	// Case 1: tag is in history → not truncated
+	repo := newRepo(t)
+	c0 := createCommitWithFile(t, repo, "c0.txt", "c0")
+	createTagAt(t, repo, c0, "v1.0.0")
+	c1 := createCommitWithFile(t, repo, "c1.txt", "c1")
+	c2 := createCommitWithFile(t, repo, "c2.txt", "c2")
+
+	p := projectAtCommit(t, repo, c2)
+	commits, truncated, err := p.CommitSinceTag("v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if truncated {
+		t.Error("expected truncated=false when tag is in history")
+	}
+	// CommitSinceTag returns [C2, C1, C0] (tag included)
+	if len(commits) != 3 {
+		t.Errorf("expected 3 commits (C2, C1, C0), got %d", len(commits))
+	}
+	_ = c1 // used implicitly via commit chain
+
+	// Case 2: tag is out of range → truncated
+	// cOrphan is created after c2 in the worktree → its parent is c2
+	// projectAtCommit(repo, c2) goes backward from c2, never reaches cOrphan
+	cOrphan := createCommitWithFile(t, repo, "orphan.txt", "orphan")
+	createTagAt(t, repo, cOrphan, "v2.0.0")
+
+	p2 := projectAtCommit(t, repo, c2)
+	commits2, truncated2, err := p2.CommitSinceTag("v2.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !truncated2 {
+		t.Error("expected truncated=true when tag is not reachable from HEAD")
+	}
+	if len(commits2) == 0 {
+		t.Error("expected non-empty commit list even when truncated")
 	}
 }
 
