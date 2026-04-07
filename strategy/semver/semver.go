@@ -279,11 +279,12 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 	}, nil
 }
 
-// Current returns the version at HEAD:
-//   - Exact tag if HEAD is a tagged commit
-//   - cfg.Initial if no tag exists at all
-//   - CC-calculated version (with prefix) on a release branch with untagged HEAD
-//   - Rendered format template on a pre-release branch
+// Current returns the computed version at HEAD — always, whether or not HEAD is tagged.
+// This is equivalent to the `next` CLI command semantics.
+//
+// NOTE: the CLI `current` command uses AllCurrent (which surfaces Tagged) to return
+// the existing tag or an empty string. This method is kept for direct strategy use
+// and tests but is not invoked by any CLI command path.
 func (s Strategy) Current(p GitProject, extra map[string]string) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
