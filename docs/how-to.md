@@ -325,9 +325,10 @@ gg-version env --format json
 ```json
 {
   "git": {
+    "AuthorDate": "2026-04-06",
     "Branch": "main",
     "CommitCount": 3,
-    "Date": "2026-04-06",
+    "CommitterDate": "2026-04-06",
     "Hash": "abc1234def5678...",
     "LastTag": "v1.2.0",
     "ShortHash": "abc1234"
