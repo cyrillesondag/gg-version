@@ -1,4 +1,4 @@
-package command
+package main
 
 import (
 	"context"
@@ -261,9 +261,9 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 
 	if format == "json" {
 		out := struct {
-			Source     string                             `json:"_source"`
-			Semver     config.SemverConfig                `json:"semver"`
-			Components map[string]config.ComponentConfig  `json:"components,omitempty"`
+			Source     string                            `json:"_source"`
+			Semver     config.SemverConfig               `json:"semver"`
+			Components map[string]config.ComponentConfig `json:"components,omitempty"`
 		}{
 			Source:     source,
 			Semver:     cfg.Semver,
