@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Build
-go build ./...
+go build ./cmd/gg-version
+make build   # injects VERSION from git describe
 
 # Run all tests
 go test ./...
@@ -16,8 +17,8 @@ go test ./git/ -v -run TestNoTag
 go test ./strategy/semver/ -v -run TestFilterCommits
 
 # Run the tool locally
-go run . current
-go run . --repo /path/to/other-repo current
+go run ./cmd/gg-version current
+go run ./cmd/gg-version --repo /path/to/other-repo current
 ```
 
 ## Architecture
@@ -27,8 +28,9 @@ go run . --repo /path/to/other-repo current
 ### Package overview
 
 ```
-main.go                    — entry point, delegates to command.Run()
-command/commands.go        — CLI definition (urfave/cli/v3), commands and flags
+cmd/gg-version/
+  main.go                  — entry point; var Version injected by ldflags
+  commands.go              — CLI definition (urfave/cli/v3), commands and flags
 config/config.go           — config file loading and defaults
 format/format.go           — VersionFormat interface
 git/git.go                 — git layer (Project struct)
@@ -38,20 +40,21 @@ strategy/semver/
   component.go             — AllCurrent, AllLast, AllVars for monorepo
 ```
 
-### `command` package
+### `cmd/gg-version` package
 
-`command.Run()` builds the `urfave/cli/v3` command tree and runs it.
+`Run()` (in `commands.go`) builds the `urfave/cli/v3` command tree and runs it. Both files use `package main`.
 
 **Global flags** (apply to all subcommands):
 - `--config` (default `.gg-version.yml`) — config file path
 - `--repo` (default `.`) — git repository path
 - `--component <name>` — filter output to one component (monorepo)
 - `--root` — show only `@root` (monorepo); mutually exclusive with `--component`
+- `--var <name=value>` — extra template variable (repeatable)
 
 **Commands:**
-- `current [--var name=value]...` — version at HEAD
+- `current` — version at HEAD
 - `last` — last semver tag reachable from HEAD
-- `env [--var name=value]... [--format plain|json]` — all template variables
+- `env [--format plain|json]` — all template variables
 - `config [--format yaml|json]` — effective configuration
 - `components [--format plain|json]` — list monorepo components
 
