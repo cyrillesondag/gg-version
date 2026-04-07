@@ -48,38 +48,26 @@ func Run() error {
 				Destination: &rootFlag,
 				Usage:       "show only the root version, ignoring components",
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "extra template variable as name=value (repeatable)",
+			},
 		},
 		Commands: []*cli.Command{
 			{
-				Name:  "current",
-				Usage: "print the current version at HEAD",
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "var",
-						Usage: "extra template variable as name=value (repeatable)",
-					},
-				},
+				Name:   "current",
+				Usage:  "print the current version at HEAD",
 				Action: currentCmd,
 			},
 			{
-				Name:  "last",
-				Usage: "print the last valid semver tag reachable from HEAD",
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "var",
-						Usage: "extra template variable as name=value (accepted for CLI uniformity, has no effect on last)",
-					},
-				},
+				Name:   "last",
+				Usage:  "print the last valid semver tag reachable from HEAD",
 				Action: lastCmd,
 			},
 			{
 				Name:  "env",
 				Usage: "print all template variables available for version formatting",
 				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "var",
-						Usage: "extra template variable as name=value (repeatable)",
-					},
 					&cli.StringFlag{
 						Name:  "format",
 						Value: "plain",
@@ -131,7 +119,7 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
-	extra := parseVarFlags(cmd.StringSlice("var"))
+	extra := parseVarFlags(cmd.Root().StringSlice("var"))
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
 	results, err := strategy.AllCurrent(project, extra, cfg)
@@ -168,7 +156,7 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	extra := parseVarFlags(cmd.StringSlice("var"))
+	extra := parseVarFlags(cmd.Root().StringSlice("var"))
 	format := cmd.String("format")
 
 	project, err := gitpkg.NewProject(repoPath, "")

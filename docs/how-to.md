@@ -117,7 +117,7 @@ gg-version current
 `--var name=value` injecte des variables accessibles via `{{ .var.name }}` :
 
 ```bash
-gg-version current --var env=staging --var region=eu-west
+gg-version --var env=staging --var region=eu-west current
 ```
 
 Avec le format :

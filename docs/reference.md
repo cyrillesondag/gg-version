@@ -9,7 +9,7 @@
 Affiche la version au HEAD.
 
 ```
-gg-version [global flags] current [--var name=value]...
+gg-version [global flags] current
 ```
 
 **Comportement :**
@@ -24,7 +24,7 @@ gg-version [global flags] current [--var name=value]...
 gg-version current
 # v1.4.2
 
-gg-version current --var env=prod
+gg-version --var env=prod current
 # (utilise {{ .var.env }} dans le template de format)
 
 # En monorepo — affiche tous les composants
@@ -79,7 +79,7 @@ gg-version last --component frontend
 Affiche toutes les variables de template disponibles.
 
 ```
-gg-version [global flags] env [--var name=value]... [--format plain|json]
+gg-version [global flags] env [--format plain|json]
 ```
 
 **Comportement :**
@@ -115,7 +115,7 @@ gg-version env
 gg-version env --format json
 
 # Avec variable personnalisée
-gg-version env --var buildno=42
+gg-version --var buildno=42 env
 # var.buildno=42
 
 # En monorepo (plain)
@@ -219,6 +219,7 @@ Ces flags s'appliquent à toutes les commandes et se placent avant le nom de la 
 | `--repo <path>` | `.` | Chemin vers le dépôt Git |
 | `--component <name>` | _(aucun)_ | Filtre la sortie sur un seul composant (monorepo) |
 | `--root` | `false` | Affiche uniquement le composant `@root` (monorepo) |
+| `--var <name=value>` | _(aucun)_ | Variable de template supplémentaire (répétable) |
 
 `--component` et `--root` sont mutuellement exclusifs.
 
@@ -357,7 +358,7 @@ Captures nommées extraites du pattern de branche qui correspond. Exemple avec `
 Variables injectées via `--var name=value` sur la ligne de commande :
 
 ```bash
-gg-version current --var env=staging --var buildno=42
+gg-version --var env=staging --var buildno=42 current
 ```
 
 Accessibles comme `{{ .var.env }}` et `{{ .var.buildno }}`.
