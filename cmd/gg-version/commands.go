@@ -120,6 +120,9 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
+	if project.IsShallow() {
+		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
+	}
 	extra := parseVarFlags(cmd.Root().StringSlice("var"))
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
@@ -182,6 +185,16 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 	allResults, err := strategy.AllVars(project, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing vars: %w", err)
+	}
+
+	// Warn on stderr if any component has a truncated history (shallow clone)
+	for _, r := range allResults {
+		if gitVars, ok := r.Vars["git"].(map[string]interface{}); ok {
+			if truncated, ok := gitVars["Truncated"].(bool); ok && truncated {
+				fmt.Fprintln(os.Stderr, "warning: shallow clone — history is truncated, computed version may be underestimated")
+				break
+			}
+		}
 	}
 
 	filtered := filterVarsResults(allResults)

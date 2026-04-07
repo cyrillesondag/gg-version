@@ -346,6 +346,8 @@ Disponibles dans le champ `format` des branches et via `gg-version env`.
 | `git.Hash` | string | Hash complet du commit HEAD |
 | `git.ShortHash` | string | 7 premiers caractères du hash |
 | `git.CommitCount` | int | Nombre de commits depuis le dernier tag |
+| `git.IsShallow`  | bool | `true` si le dépôt est un clone superficiel (`git clone --depth=N`) |
+| `git.Truncated`  | bool | `true` si l'historique a été tronqué avant d'atteindre le tag de référence |
 
 ### Namespace `regex`
 
