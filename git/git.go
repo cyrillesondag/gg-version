@@ -97,6 +97,18 @@ func (p Project) LastTag(f format.VersionFormat) (string, error) {
 		if candidateIsNewer {
 			lastTag = tagRef
 			lastTagCommit = tagCommit
+			return nil
+		}
+
+		// Neither is ancestor of the other → equidistant tags.
+		// Use Compare as a deterministic tiebreaker: keep the semantically highest.
+		lastIsNewer, _ := isAncestor(lastTagCommit, tagCommit)
+		if !lastIsNewer {
+			cmp, err := f.Compare(tagRef.Name().Short(), lastTag.Name().Short())
+			if err == nil && cmp > 0 {
+				lastTag = tagRef
+				lastTagCommit = tagCommit
+			}
 		}
 
 		return nil

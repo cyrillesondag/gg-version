@@ -115,6 +115,15 @@ func createTag(t *testing.T, r *git.Repository, tag string) plumbing.Hash {
 	return tagRef.Hash()
 }
 
+func createTagAt(t *testing.T, r *git.Repository, hash plumbing.Hash, tag string) plumbing.Hash {
+	t.Helper()
+	tagRef, err := r.CreateTag(tag, hash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tagRef.Hash()
+}
+
 func semverFmt(prefix string) format.VersionFormat {
 	return semverstrategy.NewSemverFormat(prefix, nil)
 }
@@ -514,6 +523,144 @@ func TestCommitFiles_multipleFiles(t *testing.T) {
 	}
 	if len(files) != 2 {
 		t.Errorf("expected 2 files, got %v", files)
+	}
+}
+
+// createMergeCommit creates a commit with two parents directly via the storer
+// (bypasses worktree, so no file changes needed). Returns the commit hash.
+func createMergeCommit(t *testing.T, r *git.Repository, parent1, parent2 plumbing.Hash) plumbing.Hash {
+	t.Helper()
+	author := object.Signature{
+		Name:  "go-git",
+		Email: "go-git@fake.local",
+		When:  time.Now(),
+	}
+	// Get parent commits to build the tree from parent1
+	p1, err := r.CommitObject(parent1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &object.Commit{
+		Author:       author,
+		Committer:    author,
+		Message:      "merge commit",
+		TreeHash:     p1.TreeHash,
+		ParentHashes: []plumbing.Hash{parent1, parent2},
+	}
+	enc := r.Storer.NewEncodedObject()
+	if err := c.Encode(enc); err != nil {
+		t.Fatal(err)
+	}
+	hash, err := r.Storer.SetEncodedObject(enc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Update HEAD to point to the merge commit
+	head, err := r.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Storer.SetReference(plumbing.NewHashReference(head.Name(), hash)); err != nil {
+		t.Fatal(err)
+	}
+	return hash
+}
+
+// createCommitWithFile creates a commit adding a file with the given name and content.
+// This ensures unique commits even when called in rapid succession.
+func createCommitWithFile(t *testing.T, r *git.Repository, filename, content string) plumbing.Hash {
+	t.Helper()
+	wt, err := r.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := wt.Filesystem.Create(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte(content)); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wt.Add(filename); err != nil {
+		t.Fatal(err)
+	}
+	author := object.Signature{
+		Name:  "go-git",
+		Email: "go-git@fake.local",
+		When:  time.Now(),
+	}
+	h, err := wt.Commit("commit "+filename, &git.CommitOptions{
+		Author:    &author,
+		Committer: &author,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+// TestLastTag_tiebreaker: two tags equidistant from HEAD (diamond topology)
+// → the semantically highest tag must be returned deterministically.
+func TestLastTag_tiebreaker(t *testing.T) {
+	for _, order := range []struct {
+		first, second string
+	}{
+		{"1.1.0", "1.2.0"},
+		{"1.2.0", "1.1.0"},
+	} {
+		t.Run("tags_created_"+order.first+"_then_"+order.second, func(t *testing.T) {
+			repo, err := git.Init(memory.NewStorage(), memfs.New())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// C0: base commit
+			c0 := createCommit(t, repo)
+			createTagAt(t, repo, c0, "1.0.0")
+
+			// Branch A: one commit from C0 with a unique file
+			branchA := plumbing.NewBranchReferenceName("branch-a")
+			if err := repo.Storer.SetReference(plumbing.NewHashReference(branchA, c0)); err != nil {
+				t.Fatal(err)
+			}
+			wt, err := repo.Worktree()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := wt.Checkout(&git.CheckoutOptions{Branch: branchA}); err != nil {
+				t.Fatal(err)
+			}
+			cA := createCommitWithFile(t, repo, "branch-a.txt", "branch a content")
+
+			// Branch B: one commit from C0 with a different unique file
+			branchB := plumbing.NewBranchReferenceName("branch-b")
+			if err := repo.Storer.SetReference(plumbing.NewHashReference(branchB, c0)); err != nil {
+				t.Fatal(err)
+			}
+			if err := wt.Checkout(&git.CheckoutOptions{Branch: branchB}); err != nil {
+				t.Fatal(err)
+			}
+			cB := createCommitWithFile(t, repo, "branch-b.txt", "branch b content")
+
+			// Tag the two branch tips in the requested order
+			createTagAt(t, repo, cA, order.first)
+			createTagAt(t, repo, cB, order.second)
+
+			// Merge commit M with parents cA and cB
+			mergeHash := createMergeCommit(t, repo, cA, cB)
+
+			p := projectAtCommit(t, repo, mergeHash)
+			tag, err := p.LastTag(semverFmt(""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tag != "1.2.0" {
+				t.Fatalf("expected 1.2.0 (highest semver), got %s", tag)
+			}
+		})
 	}
 }
 
