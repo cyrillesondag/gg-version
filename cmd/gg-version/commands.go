@@ -68,6 +68,18 @@ func Run(version string) error {
 				Action: currentCmd,
 			},
 			{
+				Name:  "next",
+				Usage: "print the calculated next version at HEAD (even if not yet tagged)",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "format",
+						Value: "plain",
+						Usage: "output format: plain or json",
+					},
+				},
+				Action: nextCmd,
+			},
+			{
 				Name:  "last",
 				Usage: "print the last valid semver tag reachable from HEAD",
 				Flags: []cli.Flag{
@@ -143,6 +155,37 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 	results, err := strategy.AllCurrent(project, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing current version: %w", err)
+	}
+	for i := range results {
+		if !results[i].Tagged {
+			results[i].Version = ""
+		}
+	}
+	return printComponentResults(results, cmd.String("format"))
+}
+
+func nextCmd(ctx context.Context, cmd *cli.Command) error {
+	if componentFlag != "" && rootFlag {
+		return fmt.Errorf("--component and --root are mutually exclusive")
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	project, err := gitpkg.NewProject(repoPath, "")
+	if err != nil {
+		return fmt.Errorf("opening repo: %w", err)
+	}
+	if project.IsShallow() {
+		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
+	}
+	extra := parseVarFlags(cmd.Root().StringSlice("var"))
+	strategy := semverstrategy.NewStrategy(cfg.Semver)
+
+	results, err := strategy.AllCurrent(project, extra, cfg)
+	if err != nil {
+		return fmt.Errorf("computing next version: %w", err)
 	}
 	return printComponentResults(results, cmd.String("format"))
 }

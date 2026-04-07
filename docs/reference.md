@@ -14,31 +14,32 @@ gg-version [global flags] current
 
 **Comportement :**
 - HEAD est tagué → affiche exactement ce tag
-- HEAD non tagué, branche de release → affiche le prochain tag calculé (`tag_prefix + semver`)
-- HEAD non tagué, branche de pré-release → rend le template `format` de la branche
-- Aucun tag trouvé → affiche `initial`
+- HEAD non tagué → affiche `""` (chaîne vide), exit 0
+- Aucun tag trouvé → affiche `""` (chaîne vide)
+
+> Pour obtenir la version calculée sur un HEAD non tagué, utilisez `next`.
 
 **Exemples :**
 
 ```bash
+# HEAD exactement sur un tag
 gg-version current
 # v1.4.2
 
-gg-version --var env=prod current
-# (utilise {{ .var.env }} dans le template de format)
+# HEAD non tagué
+gg-version current
+# (chaîne vide)
 
-# En monorepo — affiche tous les composants
+# En monorepo — @root tagué, api non tagué
 gg-version current
 # @root        v2.1.0
-# api          v0.5.1
-# frontend     v3.0.0
+# api          
 
-# Filtrer un composant
-gg-version current --component api
-# v0.5.1
-
-gg-version current --root
-# v2.1.0
+gg-version current --format json
+# {
+#   "@root": "v2.1.0",
+#   "api": ""
+# }
 ```
 
 **Flags :**
@@ -46,6 +47,40 @@ gg-version current --root
 | Flag | Défaut | Description |
 |---|---|---|
 | `--format <plain\|json>` | `plain` | Format de sortie |
+
+---
+
+### `next`
+
+Affiche la version calculée au HEAD — qu'elle existe comme tag ou non. Comportement identique à l'ancien `current`.
+
+```
+gg-version [global flags] next
+```
+
+**Comportement :**
+- HEAD est tagué → affiche ce tag
+- HEAD non tagué, branche de release → affiche le prochain tag calculé (`tag_prefix + semver`)
+- HEAD non tagué, branche de pré-release → rend le template `format` de la branche
+- Aucun tag trouvé → affiche `initial`
+
+**Exemples :**
+
+```bash
+gg-version next
+# v1.5.0  (version calculée même si HEAD non tagué)
+
+gg-version next --format json
+# "v1.5.0"
+```
+
+**Flags :**
+
+| Flag | Défaut | Description |
+|---|---|---|
+| `--format <plain\|json>` | `plain` | Format de sortie |
+
+> **Migration :** Si vos pipelines utilisaient `current` pour la version calculée sur un commit non tagué, migrez vers `next`.
 
 ---
 
