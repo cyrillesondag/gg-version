@@ -23,8 +23,9 @@ var (
 	rootFlag      bool
 )
 
-func Run() error {
+func Run(version string) error {
 	cmd := &cli.Command{
+		Version: version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "config",

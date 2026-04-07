@@ -9,7 +9,7 @@ import (
 var Version = "dev"
 
 func main() {
-	if err := Run(); err != nil {
+	if err := Run(Version); err != nil {
 		log.Fatal(err)
 	}
 }
