@@ -11,6 +11,7 @@ import (
 type ComponentResult struct {
 	Name    string
 	Version string
+	Tagged  bool // true if HEAD is exactly on this tag
 }
 
 // ComponentVarsResult holds vars for one entity.
@@ -53,11 +54,19 @@ func sortedComponentNames(components map[string]config.ComponentConfig) []string
 // When no components are defined, returns a single result with Name="" (backward compat).
 func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error) {
 	if len(cfg.Components) == 0 {
-		v, err := s.Current(p, extra)
+		filter := FilterConfig{
+			ExcludePaths:  s.cfg.IgnorePaths,
+			IgnoreCommits: s.cfg.IgnoreCommits,
+		}
+		vars, err := s.varsCore(p, extra, s.cfg.TagPrefix, filter)
 		if err != nil {
 			return nil, err
 		}
-		return []ComponentResult{{Name: "", Version: v}}, nil
+		v, tagged, err := s.currentFromVars(p, vars, s.cfg.TagPrefix)
+		if err != nil {
+			return nil, err
+		}
+		return []ComponentResult{{Name: "", Version: v, Tagged: tagged}}, nil
 	}
 
 	// @root: excludes all component paths
@@ -69,11 +78,11 @@ func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.C
 	if err != nil {
 		return nil, err
 	}
-	rootVersion, err := s.currentFromVars(p, rootVars, s.cfg.TagPrefix)
+	rootVersion, rootTagged, err := s.currentFromVars(p, rootVars, s.cfg.TagPrefix)
 	if err != nil {
 		return nil, err
 	}
-	results := []ComponentResult{{Name: "@root", Version: rootVersion}}
+	results := []ComponentResult{{Name: "@root", Version: rootVersion, Tagged: rootTagged}}
 
 	for _, name := range sortedComponentNames(cfg.Components) {
 		comp := cfg.Components[name]
@@ -87,11 +96,11 @@ func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.C
 		if err != nil {
 			return nil, err
 		}
-		version, err := s.currentFromVars(p, vars, tagPrefix)
+		version, tagged, err := s.currentFromVars(p, vars, tagPrefix)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, ComponentResult{Name: name, Version: version})
+		results = append(results, ComponentResult{Name: name, Version: version, Tagged: tagged})
 	}
 	return results, nil
 }
@@ -181,44 +190,46 @@ func (s Strategy) lastWithPrefix(p GitProject, tagPrefix string) (string, error)
 }
 
 // currentFromVars derives the current version string from pre-computed vars.
-func (s Strategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, error) {
+// Returns (version, tagged, error) where tagged=true means HEAD is exactly on that tag.
+func (s Strategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, bool, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	branchCfg, _ := s.matchBranch(branchName)
 
 	semverMap, ok := vars["semver"].(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("internal error: semver namespace missing")
+		return "", false, fmt.Errorf("internal error: semver namespace missing")
 	}
 
 	gitMap, ok := vars["git"].(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("internal error: git namespace missing")
+		return "", false, fmt.Errorf("internal error: git namespace missing")
 	}
 	rawLastTag, _ := gitMap["LastTag"].(string)
 	if rawLastTag != "" {
 		tagged, err := p.IsHeadTagged(rawLastTag)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		if tagged {
-			return rawLastTag, nil
+			return rawLastTag, true, nil
 		}
 	}
 
 	if rawLastTag == "" {
-		return s.cfg.Initial, nil
+		return s.cfg.Initial, false, nil
 	}
 
 	semverStr, ok := semverMap["Semver"].(string)
 	if !ok {
-		return "", fmt.Errorf("internal error: semver.Semver is not a string")
+		return "", false, fmt.Errorf("internal error: semver.Semver is not a string")
 	}
 
 	if branchCfg.Release {
-		return tagPrefix + semverStr, nil
+		return tagPrefix + semverStr, false, nil
 	}
-	return renderTemplate(branchCfg.Format, vars)
+	v, err := renderTemplate(branchCfg.Format, vars)
+	return v, false, err
 }

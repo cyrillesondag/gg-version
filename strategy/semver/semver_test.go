@@ -834,6 +834,51 @@ func TestAllVars_withComponents(t *testing.T) {
 	}
 }
 
+func TestAllCurrent_tagged(t *testing.T) {
+	// DefaultConfig uses TagPrefix="" so tags must be bare semver (no "v" prefix).
+	cfg := config.Config{Semver: config.DefaultConfig().Semver}
+
+	t.Run("HEAD on tag", func(t *testing.T) {
+		repo := newRepo(t)
+		createTag(t, repo, "1.0.0")
+		fp := newFakeProject(t, repo, "main")
+
+		strategy := semverstrategy.NewStrategy(cfg.Semver)
+		results, err := strategy.AllCurrent(fp, nil, cfg)
+		if err != nil {
+			t.Fatalf("AllCurrent: %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if !results[0].Tagged {
+			t.Error("expected Tagged=true when HEAD is on tag")
+		}
+		if results[0].Version != "1.0.0" {
+			t.Errorf("expected Version=1.0.0, got %q", results[0].Version)
+		}
+	})
+
+	t.Run("HEAD not on tag", func(t *testing.T) {
+		repo := newRepo(t)
+		createTag(t, repo, "1.0.0")
+		createCommit(t, repo) // advance HEAD past tag
+		fp := newFakeProject(t, repo, "main")
+
+		strategy := semverstrategy.NewStrategy(cfg.Semver)
+		results, err := strategy.AllCurrent(fp, nil, cfg)
+		if err != nil {
+			t.Fatalf("AllCurrent: %v", err)
+		}
+		if results[0].Tagged {
+			t.Error("expected Tagged=false when HEAD is not on tag")
+		}
+		if results[0].Version == "1.0.0" {
+			t.Error("expected computed version (not the tag itself)")
+		}
+	})
+}
+
 func TestResolveTagPrefix(t *testing.T) {
 	cases := []struct {
 		name     string
