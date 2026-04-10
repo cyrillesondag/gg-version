@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-10-config-validation.md",
+  "tasks": [
+    {
+      "id": 28,
+      "subject": "Task 1: Validate — logique et tests",
+      "status": "pending",
+      "description": "**Goal:** Créer `config/validate.go` avec `Validate(cfg Config) error` et `config/validate_test.go` couvrant tous les champs validés.\n\n**Files:**\n- Create: `config/validate.go`\n- Create: `config/validate_test.go`\n\n**Acceptance Criteria:**\n- [ ] TestValidate_default PASS\n- [ ] TestValidate_invalidInitial PASS\n- [ ] TestValidate_invalidBranchPattern PASS\n- [ ] TestValidate_invalidBranchFormat PASS\n- [ ] TestValidate_branchFormatIgnoredWhenRelease PASS\n- [ ] TestValidate_invalidCCFormat PASS\n- [ ] TestValidate_invalidCCPatterns PASS\n- [ ] TestValidate_invalidIgnorePath PASS\n- [ ] TestValidate_componentEmptyPath PASS\n- [ ] TestValidate_componentInvalidPath PASS\n- [ ] TestValidate_componentInvalidTagScope PASS\n- [ ] TestValidate_multipleViolations PASS\n- [ ] go test ./config/ PASS\n\n**Verify:** `go test ./config/ -v -run TestValidate && go test ./...` → tous PASS\n\n```json:metadata\n{\"files\": [\"config/validate.go\", \"config/validate_test.go\"], \"verifyCommand\": \"go test ./config/ -v -run TestValidate && go test ./...\", \"acceptanceCriteria\": [\"TestValidate_default PASS\", \"TestValidate_invalidInitial PASS\", \"TestValidate_invalidBranchPattern PASS\", \"TestValidate_invalidBranchFormat PASS\", \"TestValidate_branchFormatIgnoredWhenRelease PASS\", \"TestValidate_invalidCCFormat PASS\", \"TestValidate_invalidCCPatterns PASS\", \"TestValidate_invalidIgnorePath PASS\", \"TestValidate_componentEmptyPath PASS\", \"TestValidate_componentInvalidPath PASS\", \"TestValidate_componentInvalidTagScope PASS\", \"TestValidate_multipleViolations PASS\", \"go test ./config/ PASS\"]}\n```"
+    },
+    {
+      "id": 29,
+      "subject": "Task 2: Intégrer Validate dans Load() et test d'intégration",
+      "status": "pending",
+      "blockedBy": [28],
+      "description": "**Goal:** Modifier `Load()` pour appeler `Validate()` après unmarshal, et ajouter un test vérifiant qu'un fichier YAML invalide produit une erreur depuis `Load()`.\n\n**Files:**\n- Modify: `config/config.go`\n- Modify: `config/validate_test.go` (ajouter TestLoad_invalidConfig)\n\n**Acceptance Criteria:**\n- [ ] TestLoad_invalidConfig PASS\n- [ ] go build ./cmd/gg-version réussit\n- [ ] go test ./... PASS\n\n**Verify:** `go build ./cmd/gg-version && go test ./...` → PASS\n\n```json:metadata\n{\"files\": [\"config/config.go\", \"config/validate_test.go\"], \"verifyCommand\": \"go build ./cmd/gg-version && go test ./...\", \"acceptanceCriteria\": [\"TestLoad_invalidConfig PASS\", \"go build ./cmd/gg-version réussit\", \"go test ./... PASS\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-10T14:00:00Z"
+}
