@@ -14,6 +14,7 @@ import (
 
 	"gover/config"
 	"gover/format"
+	"gover/gitmodel"
 )
 
 // SemverFormat validates semver tags, optionally requiring a prefix and
@@ -93,6 +94,7 @@ type GitProject interface {
 	IsShallow() bool
 	CreateTag(name, message string) error
 	PushTags() error
+	CommitHistory() ([]gitmodel.CommitWithTags, error)
 }
 
 // Strategy computes semver versions from the git history.

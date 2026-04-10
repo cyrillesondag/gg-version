@@ -13,6 +13,7 @@ import (
 	"gover/config"
 	gitformat "gover/format"
 	gitpkg "gover/git"
+	"gover/gitmodel"
 	semverstrategy "gover/strategy/semver"
 )
 
@@ -218,6 +219,14 @@ func (fp *fakeProject) CommitDate() (time.Time, time.Time, error) {
 
 func (fp *fakeProject) CreateTag(name, message string) error { return nil }
 func (fp *fakeProject) PushTags() error                      { return nil }
+
+func (fp *fakeProject) CommitHistory() ([]gitmodel.CommitWithTags, error) {
+	p, err := gitpkg.NewProjectFromRepo(fp.repo, fp.hash)
+	if err != nil {
+		return nil, err
+	}
+	return p.CommitHistory()
+}
 
 // ── Strategy config helpers ───────────────────────────────────────────────────
 

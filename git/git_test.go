@@ -765,6 +765,110 @@ func TestCreateTag_alreadyExists(t *testing.T) {
 	}
 }
 
+func TestCommitHistory(t *testing.T) {
+	t.Run("OrderAndTags", func(t *testing.T) {
+		repo := newRepo(t)
+
+		// 4 commits: c1 (oldest) → c2 → c3 → c4 (HEAD)
+		c1 := createCommit(t, repo)
+		c2 := createCommit(t, repo)
+		c3 := createCommit(t, repo)
+		c4 := createCommit(t, repo)
+
+		// Lightweight tag on c2 and c3
+		createTagAt(t, repo, c2, "v1.0.0")
+		createTagAt(t, repo, c3, "v1.5.0")
+
+		p := projectAtHead(t, repo)
+		history, err := p.CommitHistory()
+		if err != nil {
+			t.Fatalf("CommitHistory: %v", err)
+		}
+
+		// Should have 4 commits (newRepo creates 1 initial + 4 more = 5, but newRepo
+		// calls createCommit once, then we call it 4 more times)
+		// Actually newRepo creates 1 commit, then we create c1..c4 = 5 total
+		if len(history) != 5 {
+			t.Fatalf("expected 5 commits, got %d", len(history))
+		}
+
+		// HEAD (c4) is first
+		if history[0].Commit.Hash != c4 {
+			t.Errorf("history[0] should be HEAD (c4), got %v", history[0].Commit.Hash)
+		}
+		// c1 is second from last (index 3), initial commit is last (index 4)
+		if history[3].Commit.Hash != c1 {
+			t.Errorf("history[3] should be c1, got %v", history[3].Commit.Hash)
+		}
+
+		// c2 has tag v1.0.0
+		c2Idx := -1
+		for i, item := range history {
+			if item.Commit.Hash == c2 {
+				c2Idx = i
+				break
+			}
+		}
+		if c2Idx < 0 {
+			t.Fatal("c2 not found in history")
+		}
+		if len(history[c2Idx].Tags) != 1 || history[c2Idx].Tags[0] != "v1.0.0" {
+			t.Errorf("c2 tags: got %v, want [v1.0.0]", history[c2Idx].Tags)
+		}
+
+		// c3 has tag v1.5.0
+		c3Idx := -1
+		for i, item := range history {
+			if item.Commit.Hash == c3 {
+				c3Idx = i
+				break
+			}
+		}
+		if c3Idx < 0 {
+			t.Fatal("c3 not found in history")
+		}
+		if len(history[c3Idx].Tags) != 1 || history[c3Idx].Tags[0] != "v1.5.0" {
+			t.Errorf("c3 tags: got %v, want [v1.5.0]", history[c3Idx].Tags)
+		}
+
+		// c4 (HEAD) has no tags
+		if len(history[0].Tags) != 0 {
+			t.Errorf("c4 (HEAD) should have no tags, got %v", history[0].Tags)
+		}
+	})
+
+	t.Run("AnnotatedTag", func(t *testing.T) {
+		repo := newRepo(t)
+		createCommit(t, repo)
+		createCommit(t, repo)
+		createCommit(t, repo) // HEAD
+
+		// Annotated tag on HEAD
+		createAnnotatedTag(t, repo, "v2.0.0")
+		head, err := repo.Head()
+		if err != nil {
+			t.Fatalf("Head: %v", err)
+		}
+
+		p := projectAtHead(t, repo)
+		history, err := p.CommitHistory()
+		if err != nil {
+			t.Fatalf("CommitHistory: %v", err)
+		}
+
+		// HEAD (index 0) should have annotated tag v2.0.0
+		found := false
+		for _, tag := range history[0].Tags {
+			if tag == "v2.0.0" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("annotated tag v2.0.0 not found on HEAD (%v), tags: %v", head.Hash(), history[0].Tags)
+		}
+	})
+}
+
 func TestCommitDate(t *testing.T) {
 	repo := newRepo(t)
 	p := projectAtHead(t, repo)
