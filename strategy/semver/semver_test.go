@@ -960,3 +960,71 @@ func TestAllCurrent_singleTraversal(t *testing.T) {
 		t.Errorf("CommitHistory called %d times, want exactly 1", fp.commitHistoryCallCount)
 	}
 }
+
+// TestAllLast_singleTraversal verifies that AllLast calls CommitHistory
+// exactly once regardless of the number of components.
+func TestAllLast_singleTraversal(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "api/1.0.0")
+	createTag(t, repo, "web/1.0.0")
+	createTag(t, repo, "1.0.0")
+	createCommit(t, repo)
+
+	fp := newFakeProject(t, repo, "refs/heads/main")
+
+	cfg := config.Config{
+		Semver: mainConfig(),
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+			"web": {Path: "web/**"},
+		},
+	}
+
+	s := semverstrategy.NewStrategy(cfg.Semver)
+	results, err := s.AllLast(fp, cfg)
+	if err != nil {
+		t.Fatalf("AllLast: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	if fp.commitHistoryCallCount != 1 {
+		t.Errorf("CommitHistory called %d times, want exactly 1", fp.commitHistoryCallCount)
+	}
+}
+
+// TestAllVars_singleTraversal verifies that AllVars calls CommitHistory
+// exactly once regardless of the number of components.
+func TestAllVars_singleTraversal(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "api/1.0.0")
+	createTag(t, repo, "web/1.0.0")
+	createTag(t, repo, "1.0.0")
+	createCommit(t, repo)
+
+	fp := newFakeProject(t, repo, "refs/heads/main")
+
+	cfg := config.Config{
+		Semver: mainConfig(),
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+			"web": {Path: "web/**"},
+		},
+	}
+
+	s := semverstrategy.NewStrategy(cfg.Semver)
+	results, err := s.AllVars(fp, nil, cfg)
+	if err != nil {
+		t.Fatalf("AllVars: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	if fp.commitHistoryCallCount != 1 {
+		t.Errorf("CommitHistory called %d times, want exactly 1", fp.commitHistoryCallCount)
+	}
+}
