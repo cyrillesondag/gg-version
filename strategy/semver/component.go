@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	gosemver "github.com/coreos/go-semver/semver"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"gover/config"
@@ -61,21 +60,16 @@ func sortedComponentNames(components map[string]config.ComponentConfig) []string
 // sharedHistory is a pre-fetched snapshot of the commit graph, built once
 // and shared across all component computations in AllCurrent/AllLast/AllVars.
 type sharedHistory struct {
-	items       []gitpkg.CommitWithTags
-	indexByHash map[plumbing.Hash]int
+	items []gitpkg.CommitWithTags
 }
 
-// buildSharedHistory fetches the commit history once and builds a lookup index.
+// buildSharedHistory fetches the commit history once from the git layer.
 func buildSharedHistory(p GitProject) (*sharedHistory, error) {
 	items, err := p.CommitHistory()
 	if err != nil {
 		return nil, err
 	}
-	idx := make(map[plumbing.Hash]int, len(items))
-	for i, item := range items {
-		idx[item.Commit.Hash] = i
-	}
-	return &sharedHistory{items: items, indexByHash: idx}, nil
+	return &sharedHistory{items: items}, nil
 }
 
 // findLastTag returns the nearest ancestor tag valid for f, and its index in items.
