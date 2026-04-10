@@ -267,12 +267,17 @@ func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.C
 		return []ComponentResult{{Name: "", Version: v, Tagged: tagged}}, nil
 	}
 
-	// @root: excludes all component paths
+	// Monorepo: single git traversal shared across all components.
+	hist, err := buildSharedHistory(p)
+	if err != nil {
+		return nil, err
+	}
+
 	rootFilter := FilterConfig{
 		ExcludePaths:  append(append([]string{}, s.cfg.IgnorePaths...), allComponentPaths(cfg.Components)...),
 		IgnoreCommits: s.cfg.IgnoreCommits,
 	}
-	rootVars, err := s.varsCore(p, extra, s.cfg.TagPrefix, rootFilter)
+	rootVars, err := s.varsCoreFromHistory(p, extra, hist, s.cfg.TagPrefix, rootFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +295,7 @@ func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.C
 			ExcludePaths:  s.cfg.IgnorePaths,
 			IgnoreCommits: s.cfg.IgnoreCommits,
 		}
-		vars, err := s.varsCore(p, extra, tagPrefix, compFilter)
+		vars, err := s.varsCoreFromHistory(p, extra, hist, tagPrefix, compFilter)
 		if err != nil {
 			return nil, err
 		}
@@ -313,20 +318,35 @@ func (s Strategy) AllLast(p GitProject, cfg config.Config) ([]ComponentResult, e
 		return []ComponentResult{{Name: "", Version: v}}, nil
 	}
 
-	rootLast, err := s.lastWithPrefix(p, s.cfg.TagPrefix)
+	// Monorepo: single git traversal shared across all components.
+	hist, err := buildSharedHistory(p)
 	if err != nil {
 		return nil, err
 	}
-	results := []ComponentResult{{Name: "@root", Version: rootLast}}
+
+	branchName, err := p.BranchName()
+	if err != nil {
+		return nil, fmt.Errorf("getting branch name: %w", err)
+	}
+	_, captures := s.matchBranch(branchName)
+	constraints := versionConstraints(captures)
+
+	rootF := NewSemverFormat(s.cfg.TagPrefix, constraints)
+	rootTag, _ := hist.findLastTag(rootF)
+	if rootTag == "0.0.0" {
+		rootTag = s.cfg.Initial
+	}
+	results := []ComponentResult{{Name: "@root", Version: rootTag}}
 
 	for _, name := range sortedComponentNames(cfg.Components) {
 		comp := cfg.Components[name]
 		tagPrefix := ResolveTagPrefix(name, comp, s.cfg.TagPrefix)
-		v, err := s.lastWithPrefix(p, tagPrefix)
-		if err != nil {
-			return nil, err
+		f := NewSemverFormat(tagPrefix, constraints)
+		tag, _ := hist.findLastTag(f)
+		if tag == "0.0.0" {
+			tag = s.cfg.Initial
 		}
-		results = append(results, ComponentResult{Name: name, Version: v})
+		results = append(results, ComponentResult{Name: name, Version: tag})
 	}
 	return results, nil
 }
@@ -341,11 +361,17 @@ func (s Strategy) AllVars(p GitProject, extra map[string]string, cfg config.Conf
 		return []ComponentVarsResult{{Name: "", Vars: vars}}, nil
 	}
 
+	// Monorepo: single git traversal shared across all components.
+	hist, err := buildSharedHistory(p)
+	if err != nil {
+		return nil, err
+	}
+
 	rootFilter := FilterConfig{
 		ExcludePaths:  append(append([]string{}, s.cfg.IgnorePaths...), allComponentPaths(cfg.Components)...),
 		IgnoreCommits: s.cfg.IgnoreCommits,
 	}
-	rootVars, err := s.varsCore(p, extra, s.cfg.TagPrefix, rootFilter)
+	rootVars, err := s.varsCoreFromHistory(p, extra, hist, s.cfg.TagPrefix, rootFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -359,32 +385,13 @@ func (s Strategy) AllVars(p GitProject, extra map[string]string, cfg config.Conf
 			ExcludePaths:  s.cfg.IgnorePaths,
 			IgnoreCommits: s.cfg.IgnoreCommits,
 		}
-		vars, err := s.varsCore(p, extra, tagPrefix, compFilter)
+		vars, err := s.varsCoreFromHistory(p, extra, hist, tagPrefix, compFilter)
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, ComponentVarsResult{Name: name, Vars: vars})
 	}
 	return results, nil
-}
-
-// lastWithPrefix returns the last tag for a given tag prefix, or cfg.Initial if none.
-func (s Strategy) lastWithPrefix(p GitProject, tagPrefix string) (string, error) {
-	branchName, err := p.BranchName()
-	if err != nil {
-		return "", err
-	}
-	_, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
-	f := NewSemverFormat(tagPrefix, constraints)
-	tag, err := p.LastTag(f)
-	if err != nil {
-		return "", err
-	}
-	if tag == "0.0.0" {
-		return s.cfg.Initial, nil
-	}
-	return tag, nil
 }
 
 // currentFromVars derives the current version string from pre-computed vars.

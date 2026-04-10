@@ -163,9 +163,10 @@ func headHash(t *testing.T, r *gogit.Repository) plumbing.Hash {
 // ── fakeProject implements semverstrategy.GitProject ─────────────────────────
 
 type fakeProject struct {
-	repo   *gogit.Repository
-	hash   plumbing.Hash
-	branch string
+	repo                   *gogit.Repository
+	hash                   plumbing.Hash
+	branch                 string
+	commitHistoryCallCount int // incremented each time CommitHistory is called
 }
 
 func newFakeProject(t *testing.T, repo *gogit.Repository, branch string) *fakeProject {
@@ -220,6 +221,7 @@ func (fp *fakeProject) CreateTag(name, message string) error { return nil }
 func (fp *fakeProject) PushTags() error                      { return nil }
 
 func (fp *fakeProject) CommitHistory() ([]gitpkg.CommitWithTags, error) {
+	fp.commitHistoryCallCount++
 	p, err := gitpkg.NewProjectFromRepo(fp.repo, fp.hash)
 	if err != nil {
 		return nil, err
@@ -906,5 +908,55 @@ func TestResolveTagPrefix(t *testing.T) {
 		if got != tc.expected {
 			t.Errorf("ResolveTagPrefix(%q, ..., %q) = %q, want %q", tc.name, tc.global, got, tc.expected)
 		}
+	}
+}
+
+// TestAllCurrent_singleTraversal verifies that AllCurrent calls CommitHistory
+// exactly once regardless of the number of components.
+func TestAllCurrent_singleTraversal(t *testing.T) {
+	repo := newRepo(t) // creates initial commit at HEAD
+
+	// Tag the initial commit for all scopes.
+	createTag(t, repo, "api/1.0.0")
+	createTag(t, repo, "web/1.0.0")
+	createTag(t, repo, "1.0.0")
+
+	// Add one more commit so HEAD is ahead of all tags.
+	createCommit(t, repo)
+
+	fp := newFakeProject(t, repo, "refs/heads/main")
+
+	cfg := config.Config{
+		Semver: mainConfig(),
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+			"web": {Path: "web/**"},
+		},
+	}
+	cfg.Semver.TagPrefix = ""
+
+	s := semverstrategy.NewStrategy(cfg.Semver)
+	results, err := s.AllCurrent(fp, nil, cfg)
+	if err != nil {
+		t.Fatalf("AllCurrent: %v", err)
+	}
+
+	// Expect 3 results: @root, api, web.
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d: %+v", len(results), results)
+	}
+	if results[0].Name != "@root" {
+		t.Errorf("results[0].Name = %q, want @root", results[0].Name)
+	}
+	if results[1].Name != "api" {
+		t.Errorf("results[1].Name = %q, want api", results[1].Name)
+	}
+	if results[2].Name != "web" {
+		t.Errorf("results[2].Name = %q, want web", results[2].Name)
+	}
+
+	// CommitHistory must be called exactly once (single traversal).
+	if fp.commitHistoryCallCount != 1 {
+		t.Errorf("CommitHistory called %d times, want exactly 1", fp.commitHistoryCallCount)
 	}
 }
