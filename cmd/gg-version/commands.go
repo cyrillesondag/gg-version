@@ -25,7 +25,9 @@ var (
 
 func Run(version string) error {
 	cmd := &cli.Command{
-		Version: version,
+		Version:                    version,
+		EnableShellCompletion:      true,
+		ShellCompletionCommandName: "completion",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "config",

@@ -492,3 +492,42 @@ Le bump le plus élevé parmi tous les commits depuis le dernier tag détermine 
 |---|---|
 | `0` | Succès |
 | `1` | Erreur (dépôt introuvable, config invalide, flag inconnu…) |
+
+---
+
+## Shell completion
+
+`gg-version` supporte la completion shell native pour bash, zsh, fish et PowerShell via la sous-commande `completion`.
+
+### Installation
+
+**bash**
+```bash
+echo 'source <(gg-version completion bash)' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**zsh**
+```bash
+echo 'source <(gg-version completion zsh)' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**fish**
+```bash
+gg-version completion fish > ~/.config/fish/completions/gg-version.fish
+```
+
+**PowerShell**
+```powershell
+gg-version completion pwsh >> $PROFILE
+```
+
+### Génération du script
+
+```bash
+gg-version completion bash # script bash
+gg-version completion zsh  # script zsh
+gg-version completion fish # script fish
+gg-version completion pwsh # script PowerShell
+```

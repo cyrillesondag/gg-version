@@ -101,7 +101,6 @@ Avantage : pas de changement de signature de `varsCore`. La valeur est aussi dis
 | `git/git_test.go` | `TestIsShallow`, `TestCommitSinceTag_truncated` |
 | `strategy/semver/semver.go` | `GitProject` interface : `IsShallow() bool`, `CommitSinceTag` mise à jour ; `varsCore` : `git.IsShallow`, `git.Truncated` |
 | `strategy/semver/semver_test.go` | `fakeProject.IsShallow()` stub ; `fakeProject.CommitSinceTag` mise à jour |
-| `strategy/semver/component.go` | Mise à jour des appels à `CommitSinceTag` |
 | `cmd/gg-version/commands.go` | Avertissement stderr si `git.Truncated` est `true` |
 | `docs/reference.md` | Ajouter `git.IsShallow` et `git.Truncated` au tableau des variables |
 
