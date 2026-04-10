@@ -88,7 +88,7 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parsing config file %s: %w", path, err)
 	}
 	if err := Validate(cfg); err != nil {
-		return Config{}, fmt.Errorf("config file %s: %w", path, err)
+		return Config{}, fmt.Errorf("validating config file %s: %w", path, err)
 	}
 	return cfg, nil
 }

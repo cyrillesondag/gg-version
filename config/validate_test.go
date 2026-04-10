@@ -157,6 +157,9 @@ func TestLoad_invalidConfig(t *testing.T) {
 	if !strings.Contains(err.Error(), "semver.initial") {
 		t.Errorf("expected error to mention semver.initial, got: %v", err)
 	}
+	if !strings.Contains(err.Error(), f.Name()) {
+		t.Errorf("expected error to contain file path %s, got: %v", f.Name(), err)
+	}
 }
 
 func TestValidate_multipleViolations(t *testing.T) {
