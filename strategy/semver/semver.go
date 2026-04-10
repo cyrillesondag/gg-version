@@ -103,11 +103,9 @@ type Strategy interface {
 	Current(p GitProject, extra map[string]string) (string, error)
 	Last(p GitProject) (string, error)
 	Vars(p GitProject, extra map[string]string) (map[string]interface{}, error)
-	varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error)
 	AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
 	AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error)
 	AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error)
-	varsCoreFromHistory(p GitProject, extra map[string]string, hist *sharedHistory, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error)
 }
 
 type semverStrategy struct {

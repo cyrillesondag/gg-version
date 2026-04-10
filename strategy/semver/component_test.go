@@ -186,7 +186,7 @@ func TestVarsCoreFromHistory(t *testing.T) {
 			Patch:  []string{`^fix(?:\(.+\))?:`},
 		},
 	}
-	s := NewStrategy(cfg)
+	strat := semverStrategy{cfg: cfg}
 
 	filterCfg := FilterConfig{
 		ExcludePaths:  cfg.IgnorePaths,
@@ -194,7 +194,7 @@ func TestVarsCoreFromHistory(t *testing.T) {
 	}
 
 	// Ground truth from varsCore.
-	wantVars, err := s.varsCore(p, nil, cfg.TagPrefix, filterCfg)
+	wantVars, err := strat.varsCore(p, nil, cfg.TagPrefix, filterCfg)
 	if err != nil {
 		t.Fatalf("varsCore: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestVarsCoreFromHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildSharedHistory: %v", err)
 	}
-	gotVars, err := s.varsCoreFromHistory(p, nil, hist, cfg.TagPrefix, filterCfg)
+	gotVars, err := strat.varsCoreFromHistory(p, nil, hist, cfg.TagPrefix, filterCfg)
 	if err != nil {
 		t.Fatalf("varsCoreFromHistory: %v", err)
 	}
