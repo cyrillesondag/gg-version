@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 
@@ -128,6 +129,11 @@ func Run(version string) error {
 					},
 				},
 				Action: componentsCmd,
+			},
+			{
+				Name:   "lint",
+				Usage:  "check that commits since the last tag follow Conventional Commits",
+				Action: lintCmd,
 			},
 			{
 				Name:  "tag",
@@ -604,6 +610,107 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 		fmt.Printf("pushed %d tag(s) to origin\n", created)
 	}
 	return nil
+}
+
+func lintCmd(ctx context.Context, cmd *cli.Command) error {
+	if componentFlag != "" && rootFlag {
+		return fmt.Errorf("--component and --root are mutually exclusive")
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	p, err := gitpkg.NewProject(repoPath, "")
+	if err != nil {
+		return fmt.Errorf("opening repo: %w", err)
+	}
+
+	// Determine tag prefix and filter config based on --component / --root.
+	tagPrefix, filterCfg, err := lintFilterConfig(cfg, componentFlag, rootFlag)
+	if err != nil {
+		return err
+	}
+
+	f := semverstrategy.NewSemverFormat(tagPrefix, nil)
+	lastTag, err := p.LastTag(f)
+	if err != nil {
+		return fmt.Errorf("finding last tag: %w", err)
+	}
+
+	// No tag in repo: nothing to lint against.
+	if lastTag == "0.0.0" {
+		return nil
+	}
+
+	// Fetch commits since last tag (includes tagged commit at tail — exclude it).
+	all, truncated, err := p.CommitSinceTag(lastTag)
+	if err != nil {
+		return fmt.Errorf("reading commits since %s: %w", lastTag, err)
+	}
+	if truncated {
+		fmt.Fprintln(os.Stderr, "warning: shallow clone — commit history is truncated, lint results may be incomplete")
+	}
+	var commits []*object.Commit
+	if len(all) > 1 {
+		commits = all[:len(all)-1] // strip the tagged commit itself
+	}
+
+	// Apply path and SHA filters from config.
+	commits = semverstrategy.FilterCommits(commits, p.CommitFiles, filterCfg)
+
+	violations := semverstrategy.LintCommits(commits, cfg.Semver.ConventionalCommits)
+	if len(violations) == 0 {
+		return nil
+	}
+
+	fmt.Fprintf(os.Stderr, "%d commit(s) do not follow Conventional Commits since %s:\n",
+		len(violations), lastTag)
+	for _, v := range violations {
+		fmt.Fprintf(os.Stderr, "  %s %q\n", v.Hash, v.Subject)
+	}
+	return cli.Exit("", 1)
+}
+
+// lintFilterConfig returns the tag prefix and FilterConfig to use for lintCmd
+// based on --component / --root flags and the loaded config.
+func lintFilterConfig(cfg config.Config, component string, root bool) (string, semverstrategy.FilterConfig, error) {
+	ignorePaths := cfg.Semver.IgnorePaths
+	ignoreCommits := cfg.Semver.IgnoreCommits
+	globalPrefix := cfg.Semver.TagPrefix
+
+	if len(cfg.Components) == 0 {
+		// Non-monorepo: use global prefix + global ignore rules.
+		return globalPrefix, semverstrategy.FilterConfig{
+			ExcludePaths:  ignorePaths,
+			IgnoreCommits: ignoreCommits,
+		}, nil
+	}
+
+	if component != "" {
+		// --component <name>: use component tag prefix + include only component paths.
+		comp, ok := cfg.Components[component]
+		if !ok {
+			return "", semverstrategy.FilterConfig{}, fmt.Errorf("component %q not found in config", component)
+		}
+		tagPrefix := semverstrategy.ResolveTagPrefix(component, comp, globalPrefix)
+		return tagPrefix, semverstrategy.FilterConfig{
+			IncludePaths:  []string{comp.Path},
+			ExcludePaths:  ignorePaths,
+			IgnoreCommits: ignoreCommits,
+		}, nil
+	}
+
+	// Monorepo default / --root: use global prefix, exclude all component paths.
+	allCompPaths := make([]string, 0, len(cfg.Components))
+	for _, c := range cfg.Components {
+		allCompPaths = append(allCompPaths, c.Path)
+	}
+	excludePaths := append(append([]string{}, ignorePaths...), allCompPaths...)
+	return globalPrefix, semverstrategy.FilterConfig{
+		ExcludePaths:  excludePaths,
+		IgnoreCommits: ignoreCommits,
+	}, nil
 }
 
 // parseVarFlags parses a slice of "name=value" strings into a map.

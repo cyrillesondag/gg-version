@@ -347,6 +347,52 @@ error: creating tag v2.2.0: tag already exists
 
 ---
 
+### `lint`
+
+Vérifie que les commits depuis le dernier tag respectent le format Conventional Commits. Retourne exit 1 si des violations sont trouvées.
+
+```
+gg-version [global flags] lint
+```
+
+**Comportement :**
+- Aucune violation → sortie vide, exit 0
+- Violations trouvées → liste sur stderr, exit 1
+- HEAD exactement sur un tag (aucun commit à analyser) → exit 0
+- Aucun tag dans le dépôt → exit 0 (pas de baseline)
+
+**Exemples :**
+
+```bash
+# Aucune violation
+gg-version lint
+echo $?  # 0
+
+# Violations trouvées
+gg-version lint
+# 2 commit(s) do not follow Conventional Commits since v1.2.0:
+#   a1b2c3d "WIP fix auth"
+#   def4567 "Merge pull request #42 from foo/bar"
+echo $?  # 1
+
+# En monorepo — linter uniquement les commits du composant api
+gg-version lint --component api
+
+# En monorepo — linter uniquement les commits @root
+gg-version lint --root
+```
+
+**Règle de violation :** un commit est signalé si son sujet (première ligne) ne correspond pas au pattern `format` de `conventional_commits` dans la config. Les commits CC de type inconnu (`chore:`, `style:`) sont **valides** — seul le format compte.
+
+**Intégration CI :**
+
+```yaml
+- name: Lint commits
+  run: gg-version lint
+```
+
+---
+
 ## Flags globaux
 
 Ces flags s'appliquent à toutes les commandes et se placent avant le nom de la commande.

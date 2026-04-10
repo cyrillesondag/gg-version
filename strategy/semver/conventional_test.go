@@ -309,3 +309,53 @@ func TestFilterCommits_globDoublestar(t *testing.T) {
 		t.Errorf("expected ** to match nested path, got %d", len(result))
 	}
 }
+
+func TestLintCommits_clean(t *testing.T) {
+	repo := newRepo(t)
+	commits := []*object.Commit{
+		makeCommit(t, repo, "feat: add login"),
+		makeCommit(t, repo, "fix(auth): correct token validation"),
+		makeCommit(t, repo, "chore: update CI"),
+	}
+	violations := semverstrategy.LintCommits(commits, defaultCC())
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations, got %d: %+v", len(violations), violations)
+	}
+}
+
+func TestLintCommits_violations(t *testing.T) {
+	repo := newRepo(t)
+	commits := []*object.Commit{
+		makeCommit(t, repo, "feat: valid commit"),
+		makeCommit(t, repo, "WIP fix auth"),
+		makeCommit(t, repo, "Merge pull request #42 from foo/bar"),
+	}
+	violations := semverstrategy.LintCommits(commits, defaultCC())
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d: %+v", len(violations), violations)
+	}
+	if violations[0].Subject != "WIP fix auth" {
+		t.Errorf("expected first violation subject %q, got %q", "WIP fix auth", violations[0].Subject)
+	}
+	if violations[1].Subject != "Merge pull request #42 from foo/bar" {
+		t.Errorf("expected second violation subject %q, got %q", "Merge pull request #42 from foo/bar", violations[1].Subject)
+	}
+	// Hash must be a 7-char hex string
+	if len(violations[0].Hash) != 7 {
+		t.Errorf("expected 7-char hash, got %q", violations[0].Hash)
+	}
+}
+
+func TestLintCommits_nilFormat(t *testing.T) {
+	repo := newRepo(t)
+	commits := []*object.Commit{
+		makeCommit(t, repo, "anything goes"),
+		makeCommit(t, repo, "WIP"),
+	}
+	// Empty Format → compilePattern returns nil → no violations
+	cfg := config.ConventionalCommitsConfig{Format: ""}
+	violations := semverstrategy.LintCommits(commits, cfg)
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations with nil format, got %d", len(violations))
+	}
+}

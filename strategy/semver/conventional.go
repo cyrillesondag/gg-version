@@ -19,6 +19,35 @@ const (
 	BumpMajor = 3
 )
 
+// LintResult holds a commit that violates the Conventional Commits format.
+type LintResult struct {
+	Hash    string // 7-char short hash
+	Subject string // first line of the commit message
+}
+
+// LintCommits returns the commits whose subject does not match the CC format regex.
+// If cfg.Format is empty or invalid, compilePattern returns nil and no violations
+// are reported (all commits pass). Apply FilterCommits before calling LintCommits
+// to respect IgnorePaths and IgnoreCommits.
+func LintCommits(commits []*object.Commit, cfg config.ConventionalCommitsConfig) []LintResult {
+	formatRe := compilePattern(cfg.Format)
+	violations := make([]LintResult, 0)
+	// If no format pattern is configured, no violations can occur.
+	if formatRe == nil {
+		return violations
+	}
+	for _, c := range commits {
+		subject := strings.SplitN(strings.TrimRight(c.Message, "\n"), "\n", 2)[0]
+		if !formatRe.MatchString(subject) {
+			violations = append(violations, LintResult{
+				Hash:    c.Hash.String()[:7],
+				Subject: subject,
+			})
+		}
+	}
+	return violations
+}
+
 // FilterConfig defines rules for including or excluding commits from CC analysis.
 type FilterConfig struct {
 	// IncludePaths: commit is included only if ≥1 modified file matches a pattern.
