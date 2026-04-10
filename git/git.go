@@ -3,7 +3,7 @@ package git
 import (
 	"fmt"
 	"gover/format"
-	"gover/gitmodel"
+	"sort"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -19,15 +19,18 @@ type Project struct {
 	head *object.Commit
 }
 
-// CommitWithTags is an alias for gitmodel.CommitWithTags kept here for
-// backwards-compatible use within the git package.
-type CommitWithTags = gitmodel.CommitWithTags
+// CommitWithTags groups a commit with the tag names that point directly to it.
+// Tags is nil for most commits.
+type CommitWithTags struct {
+	Commit *object.Commit
+	Tags   []string
+}
 
 // CommitHistory returns all commits reachable from HEAD in topological order
 // (HEAD first, ancestors later), each annotated with the tag names pointing to it.
 // Annotated tags are resolved to their target commit before matching.
 // Tags whose commits cannot be resolved (e.g. shallow clone) are silently skipped.
-func (p Project) CommitHistory() ([]gitmodel.CommitWithTags, error) {
+func (p Project) CommitHistory() ([]CommitWithTags, error) {
 	// Pass 1: build map from commit hash → tag names
 	tagsByCommit := map[plumbing.Hash][]string{}
 	tagsRef, err := p.repo.Tags()
@@ -46,12 +49,18 @@ func (p Project) CommitHistory() ([]gitmodel.CommitWithTags, error) {
 		return nil, err
 	}
 
+	// Sort tags for each commit to ensure deterministic output.
+	for hash, tags := range tagsByCommit {
+		sort.Strings(tags)
+		tagsByCommit[hash] = tags
+	}
+
 	// Pass 2: walk commits from HEAD, annotate with tags
 	iter := object.NewCommitPreorderIter(p.head, nil, nil)
 	defer iter.Close()
-	var result []gitmodel.CommitWithTags
+	var result []CommitWithTags
 	if err := iter.ForEach(func(c *object.Commit) error {
-		result = append(result, gitmodel.CommitWithTags{
+		result = append(result, CommitWithTags{
 			Commit: c,
 			Tags:   tagsByCommit[c.Hash],
 		})

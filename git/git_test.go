@@ -1,6 +1,7 @@
-package git
+package git_test
 
 import (
+	gitpkg "gover/git"
 	"gover/format"
 	semverstrategy "gover/strategy/semver"
 	"strings"
@@ -26,26 +27,26 @@ func newRepo(t *testing.T) *git.Repository {
 	return repo
 }
 
-func projectAtHead(t *testing.T, repo *git.Repository) *Project {
+func projectAtHead(t *testing.T, repo *git.Repository) *gitpkg.Project {
 	t.Helper()
 	head, err := repo.Head()
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, err := repo.CommitObject(head.Hash())
+	p, err := gitpkg.NewProjectFromRepo(repo, head.Hash())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Project{repo, commit}
+	return p
 }
 
-func projectAtCommit(t *testing.T, repo *git.Repository, hash plumbing.Hash) *Project {
+func projectAtCommit(t *testing.T, repo *git.Repository, hash plumbing.Hash) *gitpkg.Project {
 	t.Helper()
-	commit, err := repo.CommitObject(hash)
+	p, err := gitpkg.NewProjectFromRepo(repo, hash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Project{repo, commit}
+	return p
 }
 
 func createAnnotatedTag(t *testing.T, r *git.Repository, tag string) plumbing.Hash {
