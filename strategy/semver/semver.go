@@ -98,7 +98,7 @@ type GitProject interface {
 }
 
 // Strategy computes semver versions from the git history.
-// semverStrategy satisfies this interface.
+// Use NewStrategy to obtain an instance.
 type Strategy interface {
 	Current(p GitProject, extra map[string]string) (string, error)
 	Last(p GitProject) (string, error)
