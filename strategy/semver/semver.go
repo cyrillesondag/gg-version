@@ -189,6 +189,9 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 			commitsSinceTag = FilterCommits(commitsSinceTag, p.CommitFiles, filterCfg)
 			commitCount = len(commitsSinceTag)
 		}
+	} else if p.IsShallow() {
+		// Shallow clone with no tag found: the tag is likely beyond the clone depth.
+		isTruncated = true
 	}
 
 	// Conventional Commits bump analysis
