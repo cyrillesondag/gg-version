@@ -97,6 +97,13 @@ type GitProject interface {
 	CommitHistory() ([]gitpkg.CommitWithTags, error)
 }
 
+// ComponentLintResult holds the lint result for one entity (component or root).
+type ComponentLintResult struct {
+	Name       string       // "" = non-monorepo, "@root" = root, otherwise component name
+	Violations []LintResult // commits whose subject does not match the CC format
+	Truncated  bool         // true if the history is truncated (shallow clone)
+}
+
 // Strategy computes semver versions from the git history.
 // Use NewStrategy to obtain an instance.
 type Strategy interface {
@@ -106,6 +113,7 @@ type Strategy interface {
 	AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
 	AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error)
 	AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error)
+	AllLint(p GitProject, cfg config.Config) ([]ComponentLintResult, error)
 }
 
 type semverStrategy struct {

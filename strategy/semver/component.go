@@ -394,6 +394,110 @@ func (s semverStrategy) AllVars(p GitProject, extra map[string]string, cfg confi
 	return results, nil
 }
 
+// AllLint returns lint results for @root and all components.
+// When no components are defined, returns a single result with Name="" (backward compat).
+// Uses a single CommitHistory traversal for monorepo repos.
+func (s semverStrategy) AllLint(p GitProject, cfg config.Config) ([]ComponentLintResult, error) {
+	if len(cfg.Components) == 0 {
+		filterCfg := FilterConfig{
+			ExcludePaths:  s.cfg.IgnorePaths,
+			IgnoreCommits: s.cfg.IgnoreCommits,
+		}
+		violations, truncated, err := s.lintWithPrefix(p, s.cfg.TagPrefix, filterCfg)
+		if err != nil {
+			return nil, err
+		}
+		return []ComponentLintResult{{Name: "", Violations: violations, Truncated: truncated}}, nil
+	}
+
+	hist, err := buildSharedHistory(p)
+	if err != nil {
+		return nil, err
+	}
+
+	branchName, err := p.BranchName()
+	if err != nil {
+		return nil, fmt.Errorf("getting branch name: %w", err)
+	}
+	_, captures := s.matchBranch(branchName)
+	constraints := versionConstraints(captures)
+
+	rootFilter := FilterConfig{
+		ExcludePaths:  append(append([]string{}, s.cfg.IgnorePaths...), allComponentPaths(cfg.Components)...),
+		IgnoreCommits: s.cfg.IgnoreCommits,
+	}
+	rootViolations, rootTruncated, err := s.lintFromHistory(p, hist, s.cfg.TagPrefix, constraints, rootFilter)
+	if err != nil {
+		return nil, err
+	}
+	results := []ComponentLintResult{{Name: "@root", Violations: rootViolations, Truncated: rootTruncated}}
+
+	for _, name := range sortedComponentNames(cfg.Components) {
+		comp := cfg.Components[name]
+		tagPrefix := ResolveTagPrefix(name, comp, s.cfg.TagPrefix)
+		compFilter := FilterConfig{
+			IncludePaths:  []string{comp.Path},
+			ExcludePaths:  s.cfg.IgnorePaths,
+			IgnoreCommits: s.cfg.IgnoreCommits,
+		}
+		violations, truncated, err := s.lintFromHistory(p, hist, tagPrefix, constraints, compFilter)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, ComponentLintResult{Name: name, Violations: violations, Truncated: truncated})
+	}
+	return results, nil
+}
+
+// lintWithPrefix is the non-monorepo variant: uses p.LastTag + p.CommitSinceTag.
+func (s semverStrategy) lintWithPrefix(p GitProject, tagPrefix string, filterCfg FilterConfig) ([]LintResult, bool, error) {
+	f := NewSemverFormat(tagPrefix, nil)
+	lastTag, err := p.LastTag(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if lastTag == "0.0.0" {
+		return nil, false, nil
+	}
+	tagged, err := p.IsHeadTagged(lastTag)
+	if err != nil {
+		return nil, false, err
+	}
+	if tagged {
+		return nil, false, nil
+	}
+	all, truncated, err := p.CommitSinceTag(lastTag)
+	if err != nil {
+		return nil, false, fmt.Errorf("commits since %s: %w", lastTag, err)
+	}
+	var commits []*object.Commit
+	if len(all) > 1 {
+		commits = all[:len(all)-1]
+	}
+	commits = FilterCommits(commits, p.CommitFiles, filterCfg)
+	violations := LintCommits(commits, s.cfg.ConventionalCommits)
+	return violations, truncated, nil
+}
+
+// lintFromHistory is the monorepo variant: uses a pre-fetched sharedHistory.
+func (s semverStrategy) lintFromHistory(
+	p GitProject,
+	hist *sharedHistory,
+	tagPrefix string,
+	constraints map[string]string,
+	filterCfg FilterConfig,
+) ([]LintResult, bool, error) {
+	f := NewSemverFormat(tagPrefix, constraints)
+	lastTag, tagIdx := hist.findLastTag(f)
+	if lastTag == "0.0.0" {
+		return nil, false, nil
+	}
+	rawCommits, truncated := hist.commitsSince(tagIdx)
+	commits := FilterCommits(rawCommits, p.CommitFiles, filterCfg)
+	violations := LintCommits(commits, s.cfg.ConventionalCommits)
+	return violations, truncated, nil
+}
+
 // currentFromVars derives the current version string from pre-computed vars.
 // Returns (version, tagged, error) where tagged=true means HEAD is exactly on that tag.
 func (s semverStrategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, bool, error) {

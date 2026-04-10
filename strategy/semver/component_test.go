@@ -231,6 +231,303 @@ func TestVarsCoreFromHistory(t *testing.T) {
 	}
 }
 
+// ── TestAllLint ───────────────────────────────────────────────────────────────
+
+// lintConfig returns a SemverConfig with CC format configured for lint tests.
+func lintConfig() config.SemverConfig {
+	return config.SemverConfig{
+		TagPrefix: "",
+		Initial:   "0.1.0",
+		Branches:  []config.BranchConfig{{Pattern: ".*", Release: true}},
+		ConventionalCommits: config.ConventionalCommitsConfig{
+			Format: `^\w+(?:\(.+\))?!?:`,
+		},
+	}
+}
+
+// internalCreateTag creates a lightweight tag on the HEAD of an in-memory repo.
+func internalCreateTag(t *testing.T, r *gogit.Repository, tag string) {
+	t.Helper()
+	head, err := r.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.CreateTag(tag, head.Hash(), nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// countingProject wraps a GitProject to count CommitHistory calls.
+type countingProject struct {
+	GitProject
+	commitHistoryCallCount int
+}
+
+func (cp *countingProject) CommitHistory() ([]gitpkg.CommitWithTags, error) {
+	cp.commitHistoryCallCount++
+	return cp.GitProject.CommitHistory()
+}
+
+// newMonorepoProject builds a GitProject from a repo with HEAD at its current state.
+func newMonorepoProject(t *testing.T, r *gogit.Repository) GitProject {
+	t.Helper()
+	head, err := r.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := gitpkg.NewProjectFromRepo(r, head.Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestAllLint_NonMonorepo_NoViolations(t *testing.T) {
+	// Repo with 1 tag, 2 CC commits since, no violations expected.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "init.txt", "chore: init")
+	internalCreateTag(t, repo, "1.0.0")
+	internalCreateCommit(t, repo, "a.txt", "feat: add feature")
+	internalCreateCommit(t, repo, "b.txt", "fix: correct bug")
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{Semver: s.cfg}
+
+	results, err := s.AllLint(p, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	if results[0].Name != "" {
+		t.Errorf("Name=%q, want \"\"", results[0].Name)
+	}
+	if len(results[0].Violations) != 0 {
+		t.Errorf("got %d violations, want 0: %v", len(results[0].Violations), results[0].Violations)
+	}
+	if results[0].Truncated {
+		t.Error("Truncated=true, want false")
+	}
+}
+
+func TestAllLint_NonMonorepo_WithViolations(t *testing.T) {
+	// 1 CC commit + 1 non-CC commit since tag → 1 violation.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "init.txt", "chore: init")
+	internalCreateTag(t, repo, "1.0.0")
+	internalCreateCommit(t, repo, "a.txt", "feat: add feature")
+	internalCreateCommit(t, repo, "b.txt", "WIP broken stuff") // no colon → not CC format
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{Semver: s.cfg}
+
+	results, err := s.AllLint(p, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	if len(results[0].Violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(results[0].Violations))
+	}
+	if results[0].Violations[0].Subject != "WIP broken stuff" {
+		t.Errorf("Subject=%q, want \"WIP broken stuff\"", results[0].Violations[0].Subject)
+	}
+}
+
+func TestAllLint_NonMonorepo_NoTag(t *testing.T) {
+	// No tag → no violations (nothing to compare against).
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "init.txt", "wip: no tag yet")
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{Semver: s.cfg}
+
+	results, err := s.AllLint(p, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	if len(results[0].Violations) != 0 {
+		t.Errorf("got %d violations, want 0 (no tag)", len(results[0].Violations))
+	}
+}
+
+func TestAllLint_NonMonorepo_HeadIsTagged(t *testing.T) {
+	// When HEAD is exactly on a tag, no commits to lint → 0 violations.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "init.txt", "WIP bad commit") // non-CC commit
+	internalCreateTag(t, repo, "1.0.0")                        // HEAD is at the tag
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+
+	results, err := s.AllLint(p, config.Config{Semver: s.cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results[0].Violations) != 0 {
+		t.Errorf("got %d violations on tagged HEAD, want 0", len(results[0].Violations))
+	}
+}
+
+func TestAllLint_Monorepo_SingleTraversal(t *testing.T) {
+	// CommitHistory must be called exactly once regardless of number of components.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "api/main.go", "feat(api): initial")
+	internalCreateTag(t, repo, "api/1.0.0")
+	internalCreateTag(t, repo, "web/1.0.0")
+	internalCreateCommit(t, repo, "api/fix.go", "fix(api): patch")
+
+	cp := &countingProject{GitProject: newMonorepoProject(t, repo)}
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{
+		Semver: s.cfg,
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+			"web": {Path: "web/**"},
+		},
+	}
+
+	_, err = s.AllLint(cp, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	if cp.commitHistoryCallCount != 1 {
+		t.Errorf("CommitHistory called %d times, want 1", cp.commitHistoryCallCount)
+	}
+}
+
+func TestAllLint_Monorepo_AlphabeticalOrder(t *testing.T) {
+	// Results must be: [@root, api, web] regardless of map iteration order.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "root.txt", "chore: init")
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{
+		Semver: s.cfg,
+		Components: map[string]config.ComponentConfig{
+			"web": {Path: "web/**"},
+			"api": {Path: "api/**"},
+		},
+	}
+
+	results, err := s.AllLint(p, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3", len(results))
+	}
+	names := []string{results[0].Name, results[1].Name, results[2].Name}
+	want := []string{"@root", "api", "web"}
+	for i, n := range names {
+		if n != want[i] {
+			t.Errorf("results[%d].Name=%q, want %q", i, n, want[i])
+		}
+	}
+}
+
+func TestAllLint_Monorepo_RootViolation(t *testing.T) {
+	// Non-CC commit in root (touches no component path) → root has violation, api clean.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "api/main.go", "feat(api): init")
+	internalCreateTag(t, repo, "1.0.0")     // root tag
+	internalCreateTag(t, repo, "api/1.0.0") // api tag
+	internalCreateCommit(t, repo, "root.txt", "bad root commit") // root violation
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{
+		Semver: s.cfg,
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+		},
+	}
+
+	results, err := s.AllLint(p, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want 2", len(results))
+	}
+	root := results[0]
+	api := results[1]
+	if root.Name != "@root" {
+		t.Errorf("results[0].Name=%q, want \"@root\"", root.Name)
+	}
+	if len(root.Violations) != 1 {
+		t.Errorf("root violations=%d, want 1", len(root.Violations))
+	}
+	if api.Name != "api" {
+		t.Errorf("results[1].Name=%q, want \"api\"", api.Name)
+	}
+	if len(api.Violations) != 0 {
+		t.Errorf("api violations=%d, want 0", len(api.Violations))
+	}
+}
+
+func TestAllLint_Monorepo_ComponentViolation(t *testing.T) {
+	// Non-CC commit touching api/** → api has violation, root clean.
+	repo, err := gogit.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalCreateCommit(t, repo, "api/main.go", "feat(api): init")
+	internalCreateTag(t, repo, "1.0.0")
+	internalCreateTag(t, repo, "api/1.0.0")
+	internalCreateCommit(t, repo, "api/bad.go", "bad api commit") // api violation
+
+	p := newMonorepoProject(t, repo)
+	s := semverStrategy{cfg: lintConfig()}
+	cfg := config.Config{
+		Semver: s.cfg,
+		Components: map[string]config.ComponentConfig{
+			"api": {Path: "api/**"},
+		},
+	}
+
+	results, err := s.AllLint(p, cfg)
+	if err != nil {
+		t.Fatalf("AllLint: %v", err)
+	}
+	root := results[0]
+	api := results[1]
+	if len(root.Violations) != 0 {
+		t.Errorf("root violations=%d, want 0", len(root.Violations))
+	}
+	if len(api.Violations) != 1 {
+		t.Errorf("api violations=%d, want 1", len(api.Violations))
+	}
+	if api.Violations[0].Subject != "bad api commit" {
+		t.Errorf("api violation subject=%q, want \"bad api commit\"", api.Violations[0].Subject)
+	}
+}
+
 // internalCreateCommit creates a commit in an in-memory repo with unique content.
 func internalCreateCommit(t *testing.T, r *gogit.Repository, filename, msg string) plumbing.Hash {
 	t.Helper()
