@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -138,6 +139,23 @@ func TestValidate_componentInvalidTagScope(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "components.api.tag_scope") {
 		t.Errorf("expected mention of components.api.tag_scope, got: %v", err)
+	}
+}
+
+func TestLoad_invalidConfig(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "*.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString("semver:\n  initial: not-a-semver\n")
+	f.Close()
+
+	_, err = config.Load(f.Name())
+	if err == nil {
+		t.Fatal("expected Load to return error for invalid config, got nil")
+	}
+	if !strings.Contains(err.Error(), "semver.initial") {
+		t.Errorf("expected error to mention semver.initial, got: %v", err)
 	}
 }
 
