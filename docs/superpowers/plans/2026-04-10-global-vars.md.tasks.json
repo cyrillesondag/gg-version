@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-10-global-vars.md",
+  "tasks": [
+    {
+      "id": 30,
+      "subject": "Task 1: Refactoring des variables globales — commands.go",
+      "status": "pending",
+      "description": "**Goal:** Supprimer les 4 globales et câbler `globalFlags` via le contexte dans tout `commands.go`.\n\n**Files:**\n- Modify: `cmd/gg-version/commands.go`\n\n**Acceptance Criteria:**\n- [ ] Les 4 variables globales configPath, repoPath, componentFlag, rootFlag sont supprimées\n- [ ] globalFlags, contextKey, flagsFromCtx sont définis dans commands.go\n- [ ] Run() utilise un Before hook pour injecter globalFlags dans le contexte\n- [ ] Aucun flag n'a de champ Destination\n- [ ] filterComponentResults, filterVarsResults, printComponentResults acceptent globalFlags en 3ème paramètre\n- [ ] go build ./cmd/gg-version réussit\n- [ ] go test ./... PASS\n\n**Verify:** `go build ./cmd/gg-version && go test ./...` → build OK, tous les tests PASS\n\n```json:metadata\n{\"files\": [\"cmd/gg-version/commands.go\"], \"verifyCommand\": \"go build ./cmd/gg-version && go test ./...\", \"acceptanceCriteria\": [\"Les 4 variables globales supprimées\", \"globalFlags, contextKey, flagsFromCtx définis\", \"Run() utilise un Before hook\", \"Aucun Destination sur les flags\", \"filterComponentResults/filterVarsResults/printComponentResults acceptent globalFlags\", \"go build réussit\", \"go test ./... PASS\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-10T15:30:00Z"
+}
