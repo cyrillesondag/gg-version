@@ -98,19 +98,34 @@ type GitProject interface {
 }
 
 // Strategy computes semver versions from the git history.
-type Strategy struct {
+// semverStrategy satisfies this interface.
+type Strategy interface {
+	Current(p GitProject, extra map[string]string) (string, error)
+	Last(p GitProject) (string, error)
+	Vars(p GitProject, extra map[string]string) (map[string]interface{}, error)
+	varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error)
+	AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
+	AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error)
+	AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error)
+	varsCoreFromHistory(p GitProject, extra map[string]string, hist *sharedHistory, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error)
+}
+
+type semverStrategy struct {
 	cfg config.SemverConfig
 }
 
+// compile-time check that semverStrategy implements Strategy
+var _ Strategy = semverStrategy{}
+
 // NewStrategy returns a Strategy configured by cfg.
 func NewStrategy(cfg config.SemverConfig) Strategy {
-	return Strategy{cfg: cfg}
+	return semverStrategy{cfg: cfg}
 }
 
 // Last returns the last valid semver tag reachable from HEAD, respecting any
 // version constraints extracted from the branch name pattern. Returns cfg.Initial
 // when no tag is found.
-func (s Strategy) Last(p GitProject) (string, error) {
+func (s semverStrategy) Last(p GitProject) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", fmt.Errorf("getting branch name: %w", err)
@@ -137,7 +152,7 @@ func (s Strategy) Last(p GitProject) (string, error) {
 //   - "git":    Branch, AuthorDate, CommitterDate, LastTag, Hash, ShortHash, CommitCount, IsShallow, Truncated
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
-func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
+func (s semverStrategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
 	return s.varsCore(p, extra, s.cfg.TagPrefix, FilterConfig{
 		ExcludePaths:  s.cfg.IgnorePaths,
 		IgnoreCommits: s.cfg.IgnoreCommits,
@@ -146,7 +161,7 @@ func (s Strategy) Vars(p GitProject, extra map[string]string) (map[string]interf
 
 // varsCore is the parameterised implementation of Vars, allowing callers to
 // override the tag prefix and filter configuration (used by component methods).
-func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error) {
+func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
@@ -292,7 +307,7 @@ func (s Strategy) varsCore(p GitProject, extra map[string]string, tagPrefix stri
 // NOTE: the CLI `current` command uses AllCurrent (which surfaces Tagged) to return
 // the existing tag or an empty string. This method is kept for direct strategy use
 // and tests but is not invoked by any CLI command path.
-func (s Strategy) Current(p GitProject, extra map[string]string) (string, error) {
+func (s semverStrategy) Current(p GitProject, extra map[string]string) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", fmt.Errorf("getting branch name: %w", err)
@@ -344,7 +359,7 @@ func (s Strategy) Current(p GitProject, extra map[string]string) (string, error)
 // matchBranch finds the first BranchConfig whose Pattern matches branchName.
 // Returns the config and any named capture groups extracted from the match.
 // If no pattern matches, returns a default pre-release config.
-func (s Strategy) matchBranch(branchName string) (config.BranchConfig, map[string]string) {
+func (s semverStrategy) matchBranch(branchName string) (config.BranchConfig, map[string]string) {
 	for _, b := range s.cfg.Branches {
 		re, err := regexp.Compile(b.Pattern)
 		if err != nil {

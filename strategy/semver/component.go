@@ -120,7 +120,7 @@ func (h *sharedHistory) commitsSince(tagIdx int) ([]*object.Commit, bool) {
 // varsCoreFromHistory is the monorepo-optimised variant of varsCore.
 // It uses a pre-fetched sharedHistory instead of calling p.LastTag and p.CommitSinceTag,
 // so the commit graph is traversed only once across all components.
-func (s Strategy) varsCoreFromHistory(
+func (s semverStrategy) varsCoreFromHistory(
 	p GitProject,
 	extra map[string]string,
 	hist *sharedHistory,
@@ -250,7 +250,7 @@ func (s Strategy) varsCoreFromHistory(
 
 // AllCurrent returns current versions for @root and all components.
 // When no components are defined, returns a single result with Name="" (backward compat).
-func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error) {
+func (s semverStrategy) AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error) {
 	if len(cfg.Components) == 0 {
 		filter := FilterConfig{
 			ExcludePaths:  s.cfg.IgnorePaths,
@@ -309,7 +309,7 @@ func (s Strategy) AllCurrent(p GitProject, extra map[string]string, cfg config.C
 }
 
 // AllLast returns last tags for @root and all components.
-func (s Strategy) AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error) {
+func (s semverStrategy) AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error) {
 	if len(cfg.Components) == 0 {
 		v, err := s.Last(p)
 		if err != nil {
@@ -352,7 +352,7 @@ func (s Strategy) AllLast(p GitProject, cfg config.Config) ([]ComponentResult, e
 }
 
 // AllVars returns vars for @root and all components.
-func (s Strategy) AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error) {
+func (s semverStrategy) AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error) {
 	if len(cfg.Components) == 0 {
 		vars, err := s.Vars(p, extra)
 		if err != nil {
@@ -396,7 +396,7 @@ func (s Strategy) AllVars(p GitProject, extra map[string]string, cfg config.Conf
 
 // currentFromVars derives the current version string from pre-computed vars.
 // Returns (version, tagged, error) where tagged=true means HEAD is exactly on that tag.
-func (s Strategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, bool, error) {
+func (s semverStrategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, bool, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", false, err
