@@ -3,6 +3,7 @@ package git
 import (
 	"gover/format"
 	semverstrategy "gover/strategy/semver"
+	"strings"
 	"testing"
 	"time"
 
@@ -725,6 +726,42 @@ func TestCommitSinceTag_truncated(t *testing.T) {
 	}
 	if len(commits2) == 0 {
 		t.Error("expected non-empty commit list even when truncated")
+	}
+}
+
+func TestCreateTag(t *testing.T) {
+	repo := newRepo(t)
+	p := projectAtHead(t, repo)
+
+	err := p.CreateTag("v1.0.0", "chore: release v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ref, err := repo.Tag("v1.0.0")
+	if err != nil {
+		t.Fatalf("tag not found: %v", err)
+	}
+	tagObj, err := repo.TagObject(ref.Hash())
+	if err != nil {
+		t.Fatalf("expected annotated tag object: %v", err)
+	}
+	wantMsg := "chore: release v1.0.0"
+	gotMsg := strings.TrimSuffix(tagObj.Message, "\n")
+	if gotMsg != wantMsg {
+		t.Errorf("expected message %q, got %q", wantMsg, tagObj.Message)
+	}
+}
+
+func TestCreateTag_alreadyExists(t *testing.T) {
+	repo := newRepo(t)
+	p := projectAtHead(t, repo)
+
+	if err := p.CreateTag("v1.0.0", "first"); err != nil {
+		t.Fatalf("unexpected error on first create: %v", err)
+	}
+	if err := p.CreateTag("v1.0.0", "second"); err == nil {
+		t.Fatal("expected error on duplicate tag, got nil")
 	}
 }
 

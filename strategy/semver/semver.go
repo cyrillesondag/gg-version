@@ -91,6 +91,8 @@ type GitProject interface {
 	CommitFiles(c *object.Commit) ([]string, error)
 	CommitDate() (time.Time, time.Time, error)
 	IsShallow() bool
+	CreateTag(name, message string) error
+	PushTags() error
 }
 
 // Strategy computes semver versions from the git history.

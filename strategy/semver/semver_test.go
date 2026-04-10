@@ -216,6 +216,9 @@ func (fp *fakeProject) CommitDate() (time.Time, time.Time, error) {
 		time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), nil
 }
 
+func (fp *fakeProject) CreateTag(name, message string) error { return nil }
+func (fp *fakeProject) PushTags() error                      { return nil }
+
 // ── Strategy config helpers ───────────────────────────────────────────────────
 
 func mainConfig() config.SemverConfig {

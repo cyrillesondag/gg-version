@@ -129,6 +129,25 @@ func Run(version string) error {
 				},
 				Action: componentsCmd,
 			},
+			{
+				Name:  "tag",
+				Usage: "create a semver tag on HEAD for the calculated next version",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "push",
+						Usage: "push created tags to origin after creation",
+					},
+					&cli.BoolFlag{
+						Name:  "dry-run",
+						Usage: "print what would be done without creating tags",
+					},
+					&cli.StringFlag{
+						Name:  "message",
+						Usage: "annotated tag message (default: \"chore: release <version>\")",
+					},
+				},
+				Action: tagCmd,
+			},
 		},
 	}
 
@@ -515,6 +534,63 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 
 	for _, r := range filtered {
 		fmt.Printf("%-*s %s\n", maxLen, r.Name, r.Version)
+	}
+	return nil
+}
+
+func tagCmd(ctx context.Context, cmd *cli.Command) error {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	p, err := gitpkg.NewProject(repoPath, "")
+	if err != nil {
+		return fmt.Errorf("opening repo: %w", err)
+	}
+	strategy := semverstrategy.NewStrategy(cfg.Semver)
+	extra := parseVarFlags(cmd.Root().StringSlice("var"))
+	results, err := strategy.AllCurrent(p, extra, cfg)
+	if err != nil {
+		return fmt.Errorf("computing versions: %w", err)
+	}
+	filtered := filterComponentResults(results)
+
+	dryRun := cmd.Bool("dry-run")
+	push := cmd.Bool("push")
+	msgFlag := cmd.String("message")
+
+	hash, err := p.CommitHash()
+	if err != nil {
+		return fmt.Errorf("getting commit hash: %w", err)
+	}
+	shortHash := hash[:7]
+	created := 0
+
+	for _, r := range filtered {
+		tagName := r.Version
+		if tagName == "" {
+			continue
+		}
+		msg := msgFlag
+		if msg == "" {
+			msg = "chore: release " + tagName
+		}
+		if dryRun {
+			fmt.Printf("would create tag %s on %s\n", tagName, shortHash)
+			continue
+		}
+		if err := p.CreateTag(tagName, msg); err != nil {
+			return fmt.Errorf("creating tag %s: %w", tagName, err)
+		}
+		fmt.Printf("created tag %s on %s\n", tagName, shortHash)
+		created++
+	}
+
+	if push && !dryRun && created > 0 {
+		if err := p.PushTags(); err != nil {
+			return fmt.Errorf("pushing tags: %w", err)
+		}
+		fmt.Printf("pushed %d tag(s) to origin\n", created)
 	}
 	return nil
 }

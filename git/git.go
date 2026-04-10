@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
 type Project struct {
@@ -186,6 +188,33 @@ func (p Project) CommitHash() (string, error) {
 // CommitDate returns the author and committer timestamps of the HEAD commit.
 func (p Project) CommitDate() (time.Time, time.Time, error) {
 	return p.head.Author.When, p.head.Committer.When, nil
+}
+
+// CreateTag creates an annotated tag on HEAD with the given message.
+// Returns an error if the tag already exists.
+func (p Project) CreateTag(name, message string) error {
+	sig := &object.Signature{
+		Name:  "gg-version",
+		Email: "gg-version@local",
+		When:  time.Now(),
+	}
+	_, err := p.repo.CreateTag(name, p.head.Hash, &git.CreateTagOptions{
+		Message: message,
+		Tagger:  sig,
+	})
+	return err
+}
+
+// PushTags pushes all local tags to the "origin" remote.
+// Uses SSH agent for authentication; falls back to nil auth for HTTPS remotes
+// whose credentials are managed by the OS credential store.
+func (p Project) PushTags() error {
+	auth, _ := gitssh.NewSSHAgentAuth("git")
+	return p.repo.Push(&git.PushOptions{
+		RemoteName: "origin",
+		RefSpecs:   []config.RefSpec{"refs/tags/*:refs/tags/*"},
+		Auth:       auth,
+	})
 }
 
 // IsShallow reports whether this repository is a shallow clone.

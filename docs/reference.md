@@ -290,6 +290,63 @@ gg-version components
 
 ---
 
+### `tag`
+
+Crée un tag annoté sur HEAD avec la version `next` calculée. En monorepo, crée un tag par composant.
+
+```
+gg-version [global flags] tag [--push] [--dry-run] [--message <msg>]
+```
+
+**Exemples :**
+
+```bash
+gg-version tag
+# created tag v2.2.0 on a1b2c3d
+
+gg-version tag --dry-run
+# would create tag v2.2.0 on a1b2c3d
+
+gg-version tag --push
+# created tag v2.2.0 on a1b2c3d
+# pushed 1 tag(s) to origin
+
+gg-version tag --message "release: sprint 42"
+# created tag v2.2.0 on a1b2c3d
+```
+
+**Flags :**
+
+| Flag | Défaut | Description |
+|---|---|---|
+| `--push` | false | Pousse les tags vers origin après création (SSH agent) |
+| `--dry-run` | false | Affiche ce qui serait fait sans créer de tag |
+| `--message <msg>` | `"chore: release <version>"` | Message du tag annoté |
+
+**Comportement monorepo :**
+
+Sans `--component` ni `--root`, crée un tag pour chaque composant et pour `@root` :
+
+```bash
+gg-version tag --dry-run
+# would create tag v2.2.0 on a1b2c3d
+# would create tag api/v0.5.2 on a1b2c3d
+# would create tag frontend/v3.1.0 on a1b2c3d
+```
+
+Avec `--component api` : crée uniquement le tag du composant `api`.
+Avec `--root` : crée uniquement le tag `@root`.
+
+**Erreurs :**
+
+Si un tag existe déjà, la commande retourne une erreur et s'arrête :
+
+```
+error: creating tag v2.2.0: tag already exists
+```
+
+---
+
 ## Flags globaux
 
 Ces flags s'appliquent à toutes les commandes et se placent avant le nom de la commande.
