@@ -3,8 +3,16 @@ package semver
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
+
+	gosemver "github.com/coreos/go-semver/semver"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"gover/config"
+	"gover/format"
+	gitpkg "gover/git"
 )
 
 // ComponentResult holds the version result for one entity.
@@ -48,6 +56,202 @@ func sortedComponentNames(components map[string]config.ComponentConfig) []string
 	}
 	sort.Strings(names)
 	return names
+}
+
+// sharedHistory is a pre-fetched snapshot of the commit graph, built once
+// and shared across all component computations in AllCurrent/AllLast/AllVars.
+type sharedHistory struct {
+	items       []gitpkg.CommitWithTags
+	indexByHash map[plumbing.Hash]int
+}
+
+// buildSharedHistory fetches the commit history once and builds a lookup index.
+func buildSharedHistory(p GitProject) (*sharedHistory, error) {
+	items, err := p.CommitHistory()
+	if err != nil {
+		return nil, err
+	}
+	idx := make(map[plumbing.Hash]int, len(items))
+	for i, item := range items {
+		idx[item.Commit.Hash] = i
+	}
+	return &sharedHistory{items: items, indexByHash: idx}, nil
+}
+
+// findLastTag returns the nearest ancestor tag valid for f, and its index in items.
+// Items are in topological order (HEAD first), so the first valid tag encountered is
+// the nearest ancestor. If multiple valid tags share the same commit, Compare is used
+// as a deterministic tiebreaker (same logic as git.Project.LastTag).
+// Returns ("0.0.0", -1) when no valid tag is found.
+func (h *sharedHistory) findLastTag(f format.VersionFormat) (string, int) {
+	for i, item := range h.items {
+		var best string
+		found := false
+		for _, tag := range item.Tags {
+			if !f.IsValid(tag) {
+				continue
+			}
+			if !found {
+				best, found = tag, true
+			} else if cmp, err := f.Compare(tag, best); err == nil && cmp > 0 {
+				best = tag
+			}
+		}
+		if found {
+			return best, i
+		}
+	}
+	return "0.0.0", -1
+}
+
+// commitsSince returns the commits strictly between HEAD and the tagged commit
+// (items[:tagIdx], the tagged commit itself is excluded).
+// When tagIdx == -1 (shallow clone: tag not in accessible history),
+// returns all fetched commits with truncated=true.
+func (h *sharedHistory) commitsSince(tagIdx int) ([]*object.Commit, bool) {
+	if tagIdx < 0 {
+		commits := make([]*object.Commit, len(h.items))
+		for i, item := range h.items {
+			commits[i] = item.Commit
+		}
+		return commits, true
+	}
+	commits := make([]*object.Commit, tagIdx)
+	for i, item := range h.items[:tagIdx] {
+		commits[i] = item.Commit
+	}
+	return commits, false
+}
+
+// varsCoreFromHistory is the monorepo-optimised variant of varsCore.
+// It uses a pre-fetched sharedHistory instead of calling p.LastTag and p.CommitSinceTag,
+// so the commit graph is traversed only once across all components.
+func (s Strategy) varsCoreFromHistory(
+	p GitProject,
+	extra map[string]string,
+	hist *sharedHistory,
+	tagPrefix string,
+	filterCfg FilterConfig,
+) (map[string]interface{}, error) {
+	branchName, err := p.BranchName()
+	if err != nil {
+		return nil, fmt.Errorf("getting branch name: %w", err)
+	}
+
+	branchCfg, captures := s.matchBranch(branchName)
+	constraints := versionConstraints(captures)
+	f := NewSemverFormat(tagPrefix, constraints)
+
+	lastTag, tagIdx := hist.findLastTag(f)
+
+	effectiveLastTag := lastTag
+	if lastTag == "0.0.0" {
+		effectiveLastTag = s.cfg.Initial
+	}
+
+	var commitsSinceTag []*object.Commit
+	commitCount := 0
+	var isTruncated bool
+	if lastTag != "0.0.0" {
+		tagged, err := p.IsHeadTagged(lastTag)
+		if err != nil {
+			return nil, err
+		}
+		if !tagged {
+			rawCommits, truncated := hist.commitsSince(tagIdx)
+			isTruncated = truncated
+			commitsSinceTag = FilterCommits(rawCommits, p.CommitFiles, filterCfg)
+			commitCount = len(commitsSinceTag)
+		}
+	} else if p.IsShallow() {
+		// Shallow clone with no tag found: the tag is likely beyond the clone depth.
+		isTruncated = true
+	}
+
+	bumpLevel := BumpNone
+	hasNonCC := false
+	if len(commitsSinceTag) > 0 {
+		bumpLevel, hasNonCC = AnalyzeBump(commitsSinceTag, s.cfg.ConventionalCommits)
+	}
+
+	semverStr := BumpVersion(effectiveLastTag, tagPrefix, bumpLevel)
+
+	var nextMajor, nextMinor, nextPatch, nextPreRelease string
+	if sv, err := gosemver.NewVersion(semverStr); err == nil {
+		nextMajor = strconv.FormatInt(sv.Major, 10)
+		nextMinor = strconv.FormatInt(sv.Minor, 10)
+		nextPatch = strconv.FormatInt(sv.Patch, 10)
+		nextPreRelease = string(sv.PreRelease)
+	}
+
+	lastVersionStr := strings.TrimPrefix(effectiveLastTag, tagPrefix)
+	var lastMajor, lastMinor, lastPatch, lastPreRelease string
+	if sv, err := gosemver.NewVersion(lastVersionStr); err == nil {
+		lastMajor = strconv.FormatInt(sv.Major, 10)
+		lastMinor = strconv.FormatInt(sv.Minor, 10)
+		lastPatch = strconv.FormatInt(sv.Patch, 10)
+		lastPreRelease = string(sv.PreRelease)
+	}
+
+	commitHashFull, err := p.CommitHash()
+	if err != nil {
+		return nil, err
+	}
+	shortHash := commitHashFull
+	if len(shortHash) > 7 {
+		shortHash = shortHash[:7]
+	}
+	shortBranch := strings.TrimPrefix(branchName, "refs/heads/")
+
+	authorDate, committerDate, err := p.CommitDate()
+	if err != nil {
+		return nil, fmt.Errorf("getting commit date: %w", err)
+	}
+
+	rawLastTag := lastTag
+	if lastTag == "0.0.0" {
+		rawLastTag = ""
+	}
+
+	regexVars := map[string]interface{}{}
+	for k, v := range captures {
+		regexVars[k] = v
+	}
+	varVars := map[string]interface{}{}
+	for k, v := range extra {
+		varVars[k] = v
+	}
+
+	return map[string]interface{}{
+		"semver": map[string]interface{}{
+			"Semver":                    semverStr,
+			"Major":                     nextMajor,
+			"Minor":                     nextMinor,
+			"Patch":                     nextPatch,
+			"PreRelease":                nextPreRelease,
+			"LastVersion":               lastVersionStr,
+			"LastMajor":                 lastMajor,
+			"LastMinor":                 lastMinor,
+			"LastPatch":                 lastPatch,
+			"LastPreRelease":            lastPreRelease,
+			"IsBreakingChange":          bumpLevel == BumpMajor,
+			"IsPreRelease":              !branchCfg.Release,
+			"HasNonConventionalCommits": hasNonCC,
+		},
+		"git": map[string]interface{}{
+			"Branch":        shortBranch,
+			"AuthorDate":    authorDate.UTC().Format("2006-01-02"),
+			"CommitterDate": committerDate.UTC().Format("2006-01-02"),
+			"LastTag":       rawLastTag,
+			"Hash":          commitHashFull,
+			"ShortHash":     shortHash,
+			"CommitCount":   commitCount,
+			"IsShallow":     p.IsShallow(),
+			"Truncated":     isTruncated,
+		},
+		"regex": regexVars,
+		"var":   varVars,
+	}, nil
 }
 
 // AllCurrent returns current versions for @root and all components.
