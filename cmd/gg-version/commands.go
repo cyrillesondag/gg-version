@@ -78,18 +78,6 @@ func Run(version string) error {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:  "current",
-				Usage: "print the current version at HEAD",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:  "format",
-						Value: "plain",
-						Usage: "output format: plain or json",
-					},
-				},
-				Action: currentCmd,
-			},
-			{
 				Name:  "next",
 				Usage: "print the calculated next version at HEAD (even if not yet tagged)",
 				Flags: []cli.Flag{
@@ -177,37 +165,6 @@ func Run(version string) error {
 	}
 
 	return cmd.Run(context.Background(), os.Args)
-}
-
-func currentCmd(ctx context.Context, cmd *cli.Command) error {
-	flags := flagsFromCtx(ctx)
-	if flags.Component != "" && flags.Root {
-		return fmt.Errorf("--component and --root are mutually exclusive")
-	}
-
-	cfg, err := config.Load(flags.Config)
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-	project, err := gitpkg.NewProject(flags.Repo, "")
-	if err != nil {
-		return fmt.Errorf("opening repo: %w", err)
-	}
-	if project.IsShallow() {
-		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
-	}
-	strategy := semverstrategy.NewStrategy(cfg.Semver)
-
-	results, err := strategy.AllCurrent(project, flags.Vars, cfg)
-	if err != nil {
-		return fmt.Errorf("computing current version: %w", err)
-	}
-	for i := range results {
-		if !results[i].Tagged {
-			results[i].Version = ""
-		}
-	}
-	return printComponentResults(results, cmd.String("format"), flags)
 }
 
 func nextCmd(ctx context.Context, cmd *cli.Command) error {

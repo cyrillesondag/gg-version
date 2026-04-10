@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-10-remove-current.md",
+  "tasks": [
+    {
+      "id": 89,
+      "subject": "Task 1: Supprimer la commande `current` de la CLI",
+      "status": "done",
+      "description": "**Goal:** Retirer l'enregistrement de la commande `current` et la fonction `currentCmd` de `commands.go`.\n\n**Files:**\n- Modify: `cmd/gg-version/commands.go`\n\n**Acceptance Criteria:**\n- [ ] Le bloc `{Name: \"current\", ...}` retiré de la liste `Commands`\n- [ ] La fonction `currentCmd` supprimée entièrement\n- [ ] `go build ./cmd/gg-version` réussit\n- [ ] `go test ./...` tous PASS\n- [ ] `gg-version current` → erreur CLI (commande inconnue)\n\n**Verify:** `go build ./cmd/gg-version && go test ./...` → succès\n\n```json:metadata\n{\"files\": [\"cmd/gg-version/commands.go\"], \"verifyCommand\": \"go build ./cmd/gg-version && go test ./...\", \"acceptanceCriteria\": [\"bloc current retiré de Commands\", \"fonction currentCmd supprimée\", \"go build réussit\", \"go test ./... PASS\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-10T14:00:00Z"
+}
