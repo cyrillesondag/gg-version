@@ -304,10 +304,13 @@ Ces flags s'appliquent à toutes les commandes et se placent avant le nom de la 
 
 `--component` et `--root` sont mutuellement exclusifs.
 
+> **Note shell :** `@root` contient `@`, un caractère spécial dans certains contextes shell. Utiliser `--root` (préféré) ou quoter la valeur : `--component '@root'`.
+
 ```bash
 gg-version --repo /path/to/project --config /path/to/.gg-version.yml current
 gg-version --component api current
 gg-version --root last
+gg-version --component '@root' last  # équivalent à --root
 ```
 
 ---
