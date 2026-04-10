@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 
@@ -650,87 +649,78 @@ func lintCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("opening repo: %w", err)
 	}
 
-	tagPrefix, filterCfg, err := lintFilterConfig(cfg, flags.Component, flags.Root)
+	strategy := semverstrategy.NewStrategy(cfg.Semver)
+	results, err := strategy.AllLint(p, cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("lint: %w", err)
 	}
 
-	f := semverstrategy.NewSemverFormat(tagPrefix, nil)
-	lastTag, err := p.LastTag(f)
-	if err != nil {
-		return fmt.Errorf("finding last tag: %w", err)
+	isMonorepo := len(cfg.Components) > 0
+
+	// Validate --component flag against returned results.
+	if flags.Component != "" {
+		found := false
+		for _, r := range results {
+			if r.Name == flags.Component {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("component %q not found in config", flags.Component)
+		}
 	}
 
-	if lastTag == "0.0.0" {
+	results = filterLintResults(results, flags.Component, flags.Root, isMonorepo)
+
+	// Warn if any result is truncated (shallow clone).
+	for _, r := range results {
+		if r.Truncated {
+			fmt.Fprintln(os.Stderr, "warning: shallow clone — commit history is truncated, lint results may be incomplete")
+			break
+		}
+	}
+
+	// Collect all violations across filtered results.
+	var allViolations []semverstrategy.LintResult
+	for _, r := range results {
+		allViolations = append(allViolations, r.Violations...)
+	}
+
+	if len(allViolations) == 0 {
 		return nil
 	}
 
-	all, truncated, err := p.CommitSinceTag(lastTag)
-	if err != nil {
-		return fmt.Errorf("reading commits since %s: %w", lastTag, err)
-	}
-	if truncated {
-		fmt.Fprintln(os.Stderr, "warning: shallow clone — commit history is truncated, lint results may be incomplete")
-	}
-	var commits []*object.Commit
-	if len(all) > 1 {
-		commits = all[:len(all)-1]
-	}
-
-	commits = semverstrategy.FilterCommits(commits, p.CommitFiles, filterCfg)
-
-	violations := semverstrategy.LintCommits(commits, cfg.Semver.ConventionalCommits)
-	if len(violations) == 0 {
-		return nil
-	}
-
-	fmt.Fprintf(os.Stderr, "%d commit(s) do not follow Conventional Commits since %s:\n",
-		len(violations), lastTag)
-	for _, v := range violations {
+	fmt.Fprintf(os.Stderr, "%d commit(s) do not follow Conventional Commits:\n", len(allViolations))
+	for _, v := range allViolations {
 		fmt.Fprintf(os.Stderr, "  %s %q\n", v.Hash, v.Subject)
 	}
 	return cli.Exit("", 1)
 }
 
-// lintFilterConfig returns the tag prefix and FilterConfig to use for lintCmd
-// based on --component / --root flags and the loaded config.
-func lintFilterConfig(cfg config.Config, component string, root bool) (string, semverstrategy.FilterConfig, error) {
-	ignorePaths := cfg.Semver.IgnorePaths
-	ignoreCommits := cfg.Semver.IgnoreCommits
-	globalPrefix := cfg.Semver.TagPrefix
-
-	if len(cfg.Components) == 0 {
-		// Non-monorepo: use global prefix + global ignore rules.
-		return globalPrefix, semverstrategy.FilterConfig{
-			ExcludePaths:  ignorePaths,
-			IgnoreCommits: ignoreCommits,
-		}, nil
+// filterLintResults applies --component / --root to AllLint results.
+// In non-monorepo mode (isMonorepo=false), no filtering is applied.
+func filterLintResults(results []semverstrategy.ComponentLintResult, component string, root bool, isMonorepo bool) []semverstrategy.ComponentLintResult {
+	if !isMonorepo {
+		return results
 	}
-
 	if component != "" {
-		// --component <name>: use component tag prefix + include only component paths.
-		comp, ok := cfg.Components[component]
-		if !ok {
-			return "", semverstrategy.FilterConfig{}, fmt.Errorf("component %q not found in config", component)
+		for _, r := range results {
+			if r.Name == component {
+				return []semverstrategy.ComponentLintResult{r}
+			}
 		}
-		tagPrefix := semverstrategy.ResolveTagPrefix(component, comp, globalPrefix)
-		return tagPrefix, semverstrategy.FilterConfig{
-			IncludePaths:  []string{comp.Path},
-			ExcludePaths:  ignorePaths,
-			IgnoreCommits: ignoreCommits,
-		}, nil
+		return nil
 	}
-
-	// Monorepo default / --root: use global prefix, exclude all component paths.
-	allCompPaths := make([]string, 0, len(cfg.Components))
-	for _, c := range cfg.Components {
-		allCompPaths = append(allCompPaths, c.Path)
+	if root {
+		for _, r := range results {
+			if r.Name == "@root" {
+				return []semverstrategy.ComponentLintResult{r}
+			}
+		}
+		return nil
 	}
-	excludePaths := append(append([]string{}, ignorePaths...), allCompPaths...)
-	return globalPrefix, semverstrategy.FilterConfig{
-		ExcludePaths:  excludePaths,
-		IgnoreCommits: ignoreCommits,
-	}, nil
+	return results
 }
 
 // parseVarFlags parses a slice of "name=value" strings into a map.
