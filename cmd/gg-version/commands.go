@@ -17,40 +17,60 @@ import (
 	semverstrategy "gover/strategy/semver"
 )
 
-var (
-	configPath    string
-	repoPath      string
-	componentFlag string
-	rootFlag      bool
-)
+// contextKey is the unexported key type for storing globalFlags in a context.
+type contextKey struct{}
+
+// globalFlags holds the values of the CLI global flags, populated by the Before hook.
+type globalFlags struct {
+	Config    string
+	Repo      string
+	Component string
+	Root      bool
+	Vars      map[string]string // parsed from --var name=value
+}
+
+// flagsFromCtx retrieves the globalFlags from a context populated by the Before hook.
+// Returns safe defaults if the context does not contain the flags (e.g., in tests).
+func flagsFromCtx(ctx context.Context) globalFlags {
+	if f, ok := ctx.Value(contextKey{}).(globalFlags); ok {
+		return f
+	}
+	return globalFlags{Config: ".gg-version.yml", Repo: "."}
+}
 
 func Run(version string) error {
 	cmd := &cli.Command{
 		Version:                    version,
 		EnableShellCompletion:      true,
 		ShellCompletionCommandName: "completion",
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+			f := globalFlags{
+				Config:    cmd.String("config"),
+				Repo:      cmd.String("repo"),
+				Component: cmd.String("component"),
+				Root:      cmd.Bool("root"),
+				Vars:      parseVarFlags(cmd.StringSlice("var")),
+			}
+			return context.WithValue(ctx, contextKey{}, f), nil
+		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:        "config",
-				Value:       ".gg-version.yml",
-				Destination: &configPath,
-				Usage:       "path to the configuration file",
+				Name:  "config",
+				Value: ".gg-version.yml",
+				Usage: "path to the configuration file",
 			},
 			&cli.StringFlag{
-				Name:        "repo",
-				Value:       ".",
-				Destination: &repoPath,
-				Usage:       "path to the git repository",
+				Name:  "repo",
+				Value: ".",
+				Usage: "path to the git repository",
 			},
 			&cli.StringFlag{
-				Name:        "component",
-				Destination: &componentFlag,
-				Usage:       "filter output to a single component (use with components defined in config)",
+				Name:  "component",
+				Usage: "filter output to a single component (use with components defined in config)",
 			},
 			&cli.BoolFlag{
-				Name:        "root",
-				Destination: &rootFlag,
-				Usage:       "show only the root version, ignoring components",
+				Name:  "root",
+				Usage: "show only the root version, ignoring components",
 			},
 			&cli.StringSliceFlag{
 				Name:  "var",
@@ -161,25 +181,25 @@ func Run(version string) error {
 }
 
 func currentCmd(ctx context.Context, cmd *cli.Command) error {
-	if componentFlag != "" && rootFlag {
+	flags := flagsFromCtx(ctx)
+	if flags.Component != "" && flags.Root {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	project, err := gitpkg.NewProject(repoPath, "")
+	project, err := gitpkg.NewProject(flags.Repo, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
 	if project.IsShallow() {
 		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
 	}
-	extra := parseVarFlags(cmd.Root().StringSlice("var"))
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
-	results, err := strategy.AllCurrent(project, extra, cfg)
+	results, err := strategy.AllCurrent(project, flags.Vars, cfg)
 	if err != nil {
 		return fmt.Errorf("computing current version: %w", err)
 	}
@@ -188,45 +208,46 @@ func currentCmd(ctx context.Context, cmd *cli.Command) error {
 			results[i].Version = ""
 		}
 	}
-	return printComponentResults(results, cmd.String("format"))
+	return printComponentResults(results, cmd.String("format"), flags)
 }
 
 func nextCmd(ctx context.Context, cmd *cli.Command) error {
-	if componentFlag != "" && rootFlag {
+	flags := flagsFromCtx(ctx)
+	if flags.Component != "" && flags.Root {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	project, err := gitpkg.NewProject(repoPath, "")
+	project, err := gitpkg.NewProject(flags.Repo, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
 	if project.IsShallow() {
 		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
 	}
-	extra := parseVarFlags(cmd.Root().StringSlice("var"))
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
-	results, err := strategy.AllCurrent(project, extra, cfg)
+	results, err := strategy.AllCurrent(project, flags.Vars, cfg)
 	if err != nil {
 		return fmt.Errorf("computing next version: %w", err)
 	}
-	return printComponentResults(results, cmd.String("format"))
+	return printComponentResults(results, cmd.String("format"), flags)
 }
 
 func lastCmd(ctx context.Context, cmd *cli.Command) error {
-	if componentFlag != "" && rootFlag {
+	flags := flagsFromCtx(ctx)
+	if flags.Component != "" && flags.Root {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	project, err := gitpkg.NewProject(repoPath, "")
+	project, err := gitpkg.NewProject(flags.Repo, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
@@ -236,24 +257,24 @@ func lastCmd(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("computing last version: %w", err)
 	}
-	return printComponentResults(results, cmd.String("format"))
+	return printComponentResults(results, cmd.String("format"), flags)
 }
 
 func envCmd(ctx context.Context, cmd *cli.Command) error {
-	if componentFlag != "" && rootFlag {
+	flags := flagsFromCtx(ctx)
+	if flags.Component != "" && flags.Root {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	extra := parseVarFlags(cmd.Root().StringSlice("var"))
 	format := cmd.String("format")
 
-	project, err := gitpkg.NewProject(repoPath, "")
-	cfg, cfgErr := config.Load(configPath)
+	project, err := gitpkg.NewProject(flags.Repo, "")
+	cfg, cfgErr := config.Load(flags.Config)
 
 	if err != nil || cfgErr != nil {
 		// Not a git repo or no config: populate only var namespace
 		varVars := map[string]interface{}{}
-		for k, v := range extra {
+		for k, v := range flags.Vars {
 			varVars[k] = v
 		}
 		vars := map[string]interface{}{
@@ -266,7 +287,7 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	allResults, err := strategy.AllVars(project, extra, cfg)
+	allResults, err := strategy.AllVars(project, flags.Vars, cfg)
 	if err != nil {
 		return fmt.Errorf("computing vars: %w", err)
 	}
@@ -281,10 +302,10 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	filtered := filterVarsResults(allResults)
+	filtered := filterVarsResults(allResults, flags)
 
-	if componentFlag != "" && len(filtered) == 0 {
-		return fmt.Errorf("component %q not found in config", componentFlag)
+	if flags.Component != "" && len(filtered) == 0 {
+		return fmt.Errorf("component %q not found in config", flags.Component)
 	}
 
 	// Single unnamed result (no components): plain vars output
@@ -330,17 +351,18 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 }
 
 func configCmd(ctx context.Context, cmd *cli.Command) error {
+	flags := flagsFromCtx(ctx)
 	format := cmd.String("format")
 	if format != "yaml" && format != "json" {
 		return fmt.Errorf("unknown format %q: must be yaml or json", format)
 	}
 
-	source := configPath
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	source := flags.Config
+	if _, err := os.Stat(flags.Config); os.IsNotExist(err) {
 		source = "default"
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -378,12 +400,13 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 }
 
 func componentsCmd(ctx context.Context, cmd *cli.Command) error {
+	flags := flagsFromCtx(ctx)
 	format := cmd.String("format")
 	if format != "plain" && format != "json" {
 		return fmt.Errorf("unknown format %q: must be plain or json", format)
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -446,9 +469,9 @@ func componentsCmd(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// filterComponentResults filters results based on --component and --root flags.
-func filterComponentResults(results []semverstrategy.ComponentResult) []semverstrategy.ComponentResult {
-	if rootFlag {
+// filterComponentResults filters results based on globalFlags.
+func filterComponentResults(results []semverstrategy.ComponentResult, flags globalFlags) []semverstrategy.ComponentResult {
+	if flags.Root {
 		for _, r := range results {
 			if r.Name == "@root" || r.Name == "" {
 				return []semverstrategy.ComponentResult{r}
@@ -456,9 +479,9 @@ func filterComponentResults(results []semverstrategy.ComponentResult) []semverst
 		}
 		return results[:1]
 	}
-	if componentFlag != "" {
+	if flags.Component != "" {
 		for _, r := range results {
-			if r.Name == componentFlag {
+			if r.Name == flags.Component {
 				return []semverstrategy.ComponentResult{r}
 			}
 		}
@@ -467,8 +490,8 @@ func filterComponentResults(results []semverstrategy.ComponentResult) []semverst
 	return results
 }
 
-func filterVarsResults(results []semverstrategy.ComponentVarsResult) []semverstrategy.ComponentVarsResult {
-	if rootFlag {
+func filterVarsResults(results []semverstrategy.ComponentVarsResult, flags globalFlags) []semverstrategy.ComponentVarsResult {
+	if flags.Root {
 		for _, r := range results {
 			if r.Name == "@root" || r.Name == "" {
 				return []semverstrategy.ComponentVarsResult{r}
@@ -476,9 +499,9 @@ func filterVarsResults(results []semverstrategy.ComponentVarsResult) []semverstr
 		}
 		return results[:1]
 	}
-	if componentFlag != "" {
+	if flags.Component != "" {
 		for _, r := range results {
-			if r.Name == componentFlag {
+			if r.Name == flags.Component {
 				return []semverstrategy.ComponentVarsResult{r}
 			}
 		}
@@ -491,19 +514,19 @@ func filterVarsResults(results []semverstrategy.ComponentVarsResult) []semverstr
 // Single unnamed result (no components): prints version only.
 // Single result filtered by --component or --root: prints version only.
 // Multiple or named results: prints "name    version" per line (plain) or JSON object.
-func printComponentResults(results []semverstrategy.ComponentResult, format string) error {
+func printComponentResults(results []semverstrategy.ComponentResult, format string, flags globalFlags) error {
 	if format != "plain" && format != "json" {
 		return fmt.Errorf("unknown format %q: must be plain or json", format)
 	}
 
-	filtered := filterComponentResults(results)
+	filtered := filterComponentResults(results, flags)
 
-	if componentFlag != "" && len(filtered) == 0 {
-		return fmt.Errorf("component %q not found in config", componentFlag)
+	if flags.Component != "" && len(filtered) == 0 {
+		return fmt.Errorf("component %q not found in config", flags.Component)
 	}
 
 	// Single version: non-monorepo (no name) or filtered by --component/--root
-	if len(filtered) == 1 && (filtered[0].Name == "" || componentFlag != "" || rootFlag) {
+	if len(filtered) == 1 && (filtered[0].Name == "" || flags.Component != "" || flags.Root) {
 		if format == "json" {
 			b, err := json.Marshal(filtered[0].Version)
 			if err != nil {
@@ -545,15 +568,16 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 }
 
 func tagCmd(ctx context.Context, cmd *cli.Command) error {
-	if componentFlag != "" && rootFlag {
+	flags := flagsFromCtx(ctx)
+	if flags.Component != "" && flags.Root {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	p, err := gitpkg.NewProject(repoPath, "")
+	p, err := gitpkg.NewProject(flags.Repo, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
@@ -561,12 +585,11 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	extra := parseVarFlags(cmd.Root().StringSlice("var"))
-	results, err := strategy.AllCurrent(p, extra, cfg)
+	results, err := strategy.AllCurrent(p, flags.Vars, cfg)
 	if err != nil {
 		return fmt.Errorf("computing versions: %w", err)
 	}
-	filtered := filterComponentResults(results)
+	filtered := filterComponentResults(results, flags)
 
 	dryRun := cmd.Bool("dry-run")
 	push := cmd.Bool("push")
@@ -613,21 +636,21 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 }
 
 func lintCmd(ctx context.Context, cmd *cli.Command) error {
-	if componentFlag != "" && rootFlag {
+	flags := flagsFromCtx(ctx)
+	if flags.Component != "" && flags.Root {
 		return fmt.Errorf("--component and --root are mutually exclusive")
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	p, err := gitpkg.NewProject(repoPath, "")
+	p, err := gitpkg.NewProject(flags.Repo, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
 	}
 
-	// Determine tag prefix and filter config based on --component / --root.
-	tagPrefix, filterCfg, err := lintFilterConfig(cfg, componentFlag, rootFlag)
+	tagPrefix, filterCfg, err := lintFilterConfig(cfg, flags.Component, flags.Root)
 	if err != nil {
 		return err
 	}
@@ -638,12 +661,10 @@ func lintCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("finding last tag: %w", err)
 	}
 
-	// No tag in repo: nothing to lint against.
 	if lastTag == "0.0.0" {
 		return nil
 	}
 
-	// Fetch commits since last tag (includes tagged commit at tail — exclude it).
 	all, truncated, err := p.CommitSinceTag(lastTag)
 	if err != nil {
 		return fmt.Errorf("reading commits since %s: %w", lastTag, err)
@@ -653,10 +674,9 @@ func lintCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	var commits []*object.Commit
 	if len(all) > 1 {
-		commits = all[:len(all)-1] // strip the tagged commit itself
+		commits = all[:len(all)-1]
 	}
 
-	// Apply path and SHA filters from config.
 	commits = semverstrategy.FilterCommits(commits, p.CommitFiles, filterCfg)
 
 	violations := semverstrategy.LintCommits(commits, cfg.Semver.ConventionalCommits)
