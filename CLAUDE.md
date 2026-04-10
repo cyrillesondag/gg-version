@@ -17,8 +17,8 @@ go test ./git/ -v -run TestNoTag
 go test ./strategy/semver/ -v -run TestFilterCommits
 
 # Run the tool locally
-go run ./cmd/gg-version current
-go run ./cmd/gg-version --repo /path/to/other-repo current
+go run ./cmd/gg-version next
+go run ./cmd/gg-version --repo /path/to/other-repo next
 ```
 
 ## Architecture
@@ -52,7 +52,7 @@ strategy/semver/
 - `--var <name=value>` — extra template variable (repeatable)
 
 **Commands:**
-- `current` — version at HEAD
+- `next` — calculated version at HEAD
 - `last` — last semver tag reachable from HEAD
 - `env [--format plain|json]` — all template variables
 - `config [--format yaml|json]` — effective configuration

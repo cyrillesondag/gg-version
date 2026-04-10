@@ -4,66 +4,9 @@
 
 ## Commandes
 
-### `current`
-
-Affiche la version au HEAD.
-
-```
-gg-version [global flags] current
-```
-
-**Comportement :**
-- HEAD est tagué → affiche exactement ce tag
-- HEAD non tagué → affiche `""` (chaîne vide), exit 0
-- Aucun tag trouvé → affiche `""` (chaîne vide)
-
-> Pour obtenir la version calculée sur un HEAD non tagué, utilisez `next`.
-
-**Exemples :**
-
-```bash
-# HEAD exactement sur un tag
-gg-version current
-# v1.4.2
-
-# HEAD non tagué
-gg-version current
-# (chaîne vide)
-
-# Avec variable de template
-gg-version --var env=prod current
-# (utilise {{ .var.env }} dans le template de format)
-
-# En monorepo — @root tagué, api non tagué
-gg-version current
-# @root        v2.1.0
-# api          
-
-gg-version current --format json
-# {
-#   "@root": "v2.1.0",
-#   "api": ""
-# }
-
-# Filtrer un composant
-gg-version current --component api
-# (vide si api non tagué)
-
-gg-version current --root
-# v2.1.0
-```
-
-**Flags :**
-
-| Flag | Défaut | Description |
-|---|---|---|
-| `--format <plain\|json>` | `plain` | Format de sortie |
-
----
-
 ### `next`
 
-Affiche la version calculée au HEAD — qu'elle existe comme tag ou non. Comportement identique à l'ancien `current`.
+Affiche la version calculée au HEAD — qu'elle existe comme tag ou non.
 
 ```
 gg-version [global flags] next
@@ -113,7 +56,7 @@ gg-version next --root
 |---|---|---|
 | `--format <plain\|json>` | `plain` | Format de sortie |
 
-> **Migration :** Si vos pipelines utilisaient `current` pour la version calculée sur un commit non tagué, migrez vers `next`.
+> **Note :** La commande `current` a été supprimée. Utilisez `next` pour obtenir la version calculée.
 
 ---
 
@@ -128,7 +71,7 @@ gg-version [global flags] last
 **Comportement :**
 - Remonte tous les ancêtres de HEAD, filtre les tags valides selon `tag_prefix`, retourne le plus proche topologiquement.
 - Aucun tag trouvé → affiche `initial`.
-- Contrairement à `current`, `last` n'analyse pas les commits : il retourne le tag tel quel, sans calculer de bump.
+- Contrairement à `next`, `last` n'analyse pas les commits : il retourne le tag tel quel, sans calculer de bump.
 
 **Exemples :**
 
@@ -410,8 +353,8 @@ Ces flags s'appliquent à toutes les commandes et se placent avant le nom de la 
 > **Note shell :** `@root` contient `@`, un caractère spécial dans certains contextes shell. Utiliser `--root` (préféré) ou quoter la valeur : `--component '@root'`.
 
 ```bash
-gg-version --repo /path/to/project --config /path/to/.gg-version.yml current
-gg-version --component api current
+gg-version --repo /path/to/project --config /path/to/.gg-version.yml next
+gg-version --component api next
 gg-version --root last
 gg-version --component '@root' last  # équivalent à --root
 ```
@@ -548,7 +491,7 @@ Captures nommées extraites du pattern de branche qui correspond. Exemple avec `
 Variables injectées via `--var name=value` sur la ligne de commande :
 
 ```bash
-gg-version --var env=staging --var buildno=42 current
+gg-version --var env=staging --var buildno=42 next
 ```
 
 Accessibles comme `{{ .var.env }}` et `{{ .var.buildno }}`.
