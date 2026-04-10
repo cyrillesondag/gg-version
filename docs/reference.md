@@ -594,7 +594,9 @@ Le bump le plus élevé parmi tous les commits depuis le dernier tag détermine 
 | Code | Signification |
 |---|---|
 | `0` | Succès |
-| `1` | Erreur (dépôt introuvable, config invalide, flag inconnu…) |
+| `1` | Erreur (dépôt introuvable, config invalide, flag inconnu…) ou violations `lint` trouvées |
+
+> **Note `lint` :** `gg-version lint` retourne `1` quand des commits non-CC sont détectés — ce n'est pas une erreur outil mais le résultat normal d'un contrôle qualité. Les erreurs infrastructure (config manquante, dépôt introuvable) retournent également `1`, mais avec un message d'erreur sur stderr.
 
 ---
 
