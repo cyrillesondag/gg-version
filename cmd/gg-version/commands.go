@@ -401,9 +401,20 @@ func componentsCmd(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
+	// Calculate dynamic column widths
+	maxNameLen, maxPathLen := 0, 0
+	for _, name := range names {
+		if len(name) > maxNameLen {
+			maxNameLen = len(name)
+		}
+		if len(infoMap[name].Path) > maxPathLen {
+			maxPathLen = len(infoMap[name].Path)
+		}
+	}
+
 	for _, name := range names {
 		info := infoMap[name]
-		fmt.Printf("%-12s path=%-30s tag=%s\n", name, info.Path, info.TagPattern)
+		fmt.Printf("%-*s path=%-*s tag=%s\n", maxNameLen, name, maxPathLen, info.Path, info.TagPattern)
 	}
 	return nil
 }
@@ -492,8 +503,16 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 		return nil
 	}
 
+	// Calculate dynamic column width for component names
+	maxLen := 0
 	for _, r := range filtered {
-		fmt.Printf("%-12s %s\n", r.Name, r.Version)
+		if len(r.Name) > maxLen {
+			maxLen = len(r.Name)
+		}
+	}
+
+	for _, r := range filtered {
+		fmt.Printf("%-*s %s\n", maxLen, r.Name, r.Version)
 	}
 	return nil
 }
