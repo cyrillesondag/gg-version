@@ -539,6 +539,10 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 }
 
 func tagCmd(ctx context.Context, cmd *cli.Command) error {
+	if componentFlag != "" && rootFlag {
+		return fmt.Errorf("--component and --root are mutually exclusive")
+	}
+
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -546,6 +550,9 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 	p, err := gitpkg.NewProject(repoPath, "")
 	if err != nil {
 		return fmt.Errorf("opening repo: %w", err)
+	}
+	if p.IsShallow() {
+		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 	extra := parseVarFlags(cmd.Root().StringSlice("var"))
@@ -567,6 +574,10 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 	created := 0
 
 	for _, r := range filtered {
+		if r.Tagged {
+			fmt.Fprintf(os.Stderr, "already tagged as %s, skipping\n", r.Version)
+			continue
+		}
 		tagName := r.Version
 		if tagName == "" {
 			continue
