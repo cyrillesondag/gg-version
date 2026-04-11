@@ -138,7 +138,7 @@ func TestLoad_invalidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _ = f.WriteString("semver:\n  initial: not-a-semver\n")
-	f.Close()
+	_ = f.Close()
 
 	_, err = config.Load(f.Name())
 	if err == nil {

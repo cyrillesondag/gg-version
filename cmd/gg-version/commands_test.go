@@ -39,8 +39,8 @@ func newOnDiskRepo(t *testing.T) (string, *gogit.Repository) {
 	if err != nil {
 		t.Fatalf("Create README: %v", err)
 	}
-	fmt.Fprintln(f, "init")
-	f.Close()
+	_, _ = fmt.Fprintln(f, "init")
+	_ = f.Close()
 	if _, err := w.Add("README.md"); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
@@ -63,8 +63,8 @@ func addCommit(t *testing.T, r *gogit.Repository, msg string) plumbing.Hash {
 	if err != nil {
 		t.Fatalf("Create file: %v", err)
 	}
-	fmt.Fprintf(f, "commit-%d", commitCounter.Add(1))
-	f.Close()
+	_, _ = fmt.Fprintf(f, "commit-%d", commitCounter.Add(1))
+	_ = f.Close()
 	if _, err := w.Add("file.txt"); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
@@ -126,7 +126,7 @@ func captureOutput(t *testing.T, fn func()) string {
 		close(done)
 	}()
 	fn()
-	w.Close()
+	_ = w.Close()
 	<-done
 	return buf.String()
 }
