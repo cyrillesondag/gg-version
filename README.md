@@ -1,5 +1,7 @@
 # gg-version
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/cyrillesondag/gg-version/badge)](https://securityscorecards.dev/viewer/?uri=github.com/cyrillesondag/gg-version)
+
 > Automatically computes your project version from Git history and Conventional Commits — without ever writing to the repository.
 
 ---
