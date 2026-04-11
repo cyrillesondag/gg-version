@@ -1,4 +1,4 @@
-module gover
+module github.com/cyrillesondag/gg-version
 
 go 1.24.0
 

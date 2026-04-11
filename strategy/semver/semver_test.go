@@ -10,10 +10,10 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 
-	"gover/config"
-	gitformat "gover/format"
-	gitpkg "gover/git"
-	semverstrategy "gover/strategy/semver"
+	"github.com/cyrillesondag/gg-version/config"
+	gitformat "github.com/cyrillesondag/gg-version/format"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
+	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 )
 
 // ── SemverFormat tests ────────────────────────────────────────────────────────

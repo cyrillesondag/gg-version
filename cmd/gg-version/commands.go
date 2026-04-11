@@ -11,9 +11,9 @@ import (
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 
-	"gover/config"
-	gitpkg "gover/git"
-	semverstrategy "gover/strategy/semver"
+	"github.com/cyrillesondag/gg-version/config"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
+	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 )
 
 // contextKey is the unexported key type for storing globalFlags in a context.

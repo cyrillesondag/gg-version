@@ -18,7 +18,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 
-	"gover/config"
+	"github.com/cyrillesondag/gg-version/config"
 )
 
 var commitCounter atomic.Int64

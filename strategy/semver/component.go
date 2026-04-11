@@ -9,9 +9,9 @@ import (
 	gosemver "github.com/coreos/go-semver/semver"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"gover/config"
-	"gover/format"
-	gitpkg "gover/git"
+	"github.com/cyrillesondag/gg-version/config"
+	"github.com/cyrillesondag/gg-version/format"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
 )
 
 // ComponentResult holds the version result for one entity.

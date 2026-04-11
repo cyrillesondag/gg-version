@@ -12,9 +12,9 @@ import (
 	gosemver "github.com/coreos/go-semver/semver"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"gover/config"
-	"gover/format"
-	gitpkg "gover/git"
+	"github.com/cyrillesondag/gg-version/config"
+	"github.com/cyrillesondag/gg-version/format"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
 )
 
 // SemverFormat validates semver tags, optionally requiring a prefix and

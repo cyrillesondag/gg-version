@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"gover/config"
+	"github.com/cyrillesondag/gg-version/config"
 )
 
 func TestDefaultConfigWhenFileMissing(t *testing.T) {

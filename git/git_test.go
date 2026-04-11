@@ -1,9 +1,9 @@
 package git_test
 
 import (
-	gitpkg "gover/git"
-	"gover/format"
-	semverstrategy "gover/strategy/semver"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
+	"github.com/cyrillesondag/gg-version/format"
+	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 	"strings"
 	"testing"
 	"time"

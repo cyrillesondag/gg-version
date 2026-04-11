@@ -7,8 +7,8 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"gover/config"
-	semverstrategy "gover/strategy/semver"
+	"github.com/cyrillesondag/gg-version/config"
+	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 )
 
 // defaultCC returns a ConventionalCommitsConfig with standard defaults for tests.

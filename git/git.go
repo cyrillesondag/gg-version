@@ -2,7 +2,7 @@ package git
 
 import (
 	"fmt"
-	"gover/format"
+	"github.com/cyrillesondag/gg-version/format"
 	"sort"
 	"time"
 

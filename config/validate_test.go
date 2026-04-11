@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gover/config"
+	"github.com/cyrillesondag/gg-version/config"
 )
 
 func TestValidate_default(t *testing.T) {

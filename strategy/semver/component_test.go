@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-git/go-billy/v5/memfs"
 
-	"gover/config"
-	gitpkg "gover/git"
+	"github.com/cyrillesondag/gg-version/config"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
 )
 
 // mkCommit creates a minimal fake commit for testing sharedHistory operations.

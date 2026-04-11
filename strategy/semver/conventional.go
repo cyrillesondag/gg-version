@@ -8,7 +8,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"gover/config"
+	"github.com/cyrillesondag/gg-version/config"
 )
 
 // Bump levels — exported so tests can reference them symbolically.
