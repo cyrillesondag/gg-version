@@ -3,6 +3,7 @@ package semver
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -108,10 +109,10 @@ type ComponentLintResult struct {
 // Use NewStrategy to obtain an instance.
 type Strategy interface {
 	Current(p GitProject, extra map[string]string) (string, error)
-	Last(p GitProject) (string, error)
+	Last(p GitProject, extra map[string]string) (string, error)
 	Vars(p GitProject, extra map[string]string) (map[string]interface{}, error)
 	AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
-	AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error)
+	AllLast(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
 	AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error)
 	AllLint(p GitProject, cfg config.Config) ([]ComponentLintResult, error)
 }
@@ -131,14 +132,14 @@ func NewStrategy(cfg config.SemverConfig) Strategy {
 // Last returns the last valid semver tag reachable from HEAD, respecting any
 // version constraints extracted from the branch name pattern. Returns cfg.Initial
 // when no tag is found.
-func (s semverStrategy) Last(p GitProject) (string, error) {
+func (s semverStrategy) Last(p GitProject, extra map[string]string) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", fmt.Errorf("getting branch name: %w", err)
 	}
 
-	_, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	branchCfg, captures := s.matchBranch(branchName)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 	f := NewSemverFormat(s.cfg.TagPrefix, constraints)
 
 	tag, err := p.LastTag(f)
@@ -174,7 +175,7 @@ func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefi
 	}
 
 	branchCfg, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 	f := NewSemverFormat(tagPrefix, constraints)
 
 	lastTag, err := p.LastTag(f)
@@ -320,7 +321,7 @@ func (s semverStrategy) Current(p GitProject, extra map[string]string) (string, 
 	}
 
 	branchCfg, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 	f := NewSemverFormat(s.cfg.TagPrefix, constraints)
 
 	lastTag, err := p.LastTag(f)
@@ -382,15 +383,61 @@ func (s semverStrategy) matchBranch(branchName string) (config.BranchConfig, map
 	}, map[string]string{}
 }
 
-// versionConstraints extracts only major/minor/patch keys from named captures.
-func versionConstraints(captures map[string]string) map[string]string {
-	c := map[string]string{}
-	for _, key := range []string{"major", "minor", "patch"} {
-		if v, ok := captures[key]; ok {
-			c[key] = v
-		}
+// ParseWildcardConstraint parses a wildcard semver string like "1.x.x" into a
+// constraint map. Each component must be a non-negative integer or "x".
+// Returns empty map for "" or "x.x.x". Returns error for invalid input.
+func ParseWildcardConstraint(s string) (map[string]string, error) {
+	if s == "" {
+		return map[string]string{}, nil
 	}
-	return c
+	parts := strings.SplitN(s, ".", 3)
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("constraint %q: expected 3 dot-separated components (e.g. 1.x.x), got %d", s, len(parts))
+	}
+	keys := []string{"major", "minor", "patch"}
+	result := map[string]string{}
+	for i, p := range parts {
+		if p == "x" {
+			continue
+		}
+		if n, err := strconv.Atoi(p); err != nil || n < 0 {
+			return nil, fmt.Errorf("constraint %q: component %q must be a non-negative integer or 'x'", s, p)
+		}
+		result[keys[i]] = p
+	}
+	return result, nil
+}
+
+// resolveConstraint renders the branch Constraint template and parses the wildcard result.
+// Only .regex.* and .var.* are available (no .semver.* or .git.*).
+// Returns empty constraints (no filter) if Constraint is empty or on render/parse error.
+func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string, extra map[string]string) map[string]string {
+	if branchCfg.Constraint == "" {
+		return map[string]string{}
+	}
+	regexVars := map[string]interface{}{}
+	for k, v := range captures {
+		regexVars[k] = v
+	}
+	varVars := map[string]interface{}{}
+	for k, v := range extra {
+		varVars[k] = v
+	}
+	vars := map[string]interface{}{
+		"regex": regexVars,
+		"var":   varVars,
+	}
+	rendered, err := renderTemplate(branchCfg.Constraint, vars)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: rendering branch constraint %q: %v\n", branchCfg.Constraint, err)
+		return map[string]string{}
+	}
+	constraints, err := ParseWildcardConstraint(rendered)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: parsing branch constraint %q (rendered: %q): %v\n", branchCfg.Constraint, rendered, err)
+		return map[string]string{}
+	}
+	return constraints
 }
 
 // renderTemplate executes a Go text/template with the given variables.

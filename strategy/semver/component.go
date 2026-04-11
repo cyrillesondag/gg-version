@@ -133,7 +133,7 @@ func (s semverStrategy) varsCoreFromHistory(
 	}
 
 	branchCfg, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 	f := NewSemverFormat(tagPrefix, constraints)
 
 	lastTag, tagIdx := hist.findLastTag(f)
@@ -309,9 +309,9 @@ func (s semverStrategy) AllCurrent(p GitProject, extra map[string]string, cfg co
 }
 
 // AllLast returns last tags for @root and all components.
-func (s semverStrategy) AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error) {
+func (s semverStrategy) AllLast(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error) {
 	if len(cfg.Components) == 0 {
-		v, err := s.Last(p)
+		v, err := s.Last(p, extra)
 		if err != nil {
 			return nil, err
 		}
@@ -328,8 +328,8 @@ func (s semverStrategy) AllLast(p GitProject, cfg config.Config) ([]ComponentRes
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
 	}
-	_, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	branchCfg, captures := s.matchBranch(branchName)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 
 	rootF := NewSemverFormat(s.cfg.TagPrefix, constraints)
 	rootTag, _ := hist.findLastTag(rootF)
@@ -419,8 +419,8 @@ func (s semverStrategy) AllLint(p GitProject, cfg config.Config) ([]ComponentLin
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
 	}
-	_, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	branchCfg, captures := s.matchBranch(branchName)
+	constraints := resolveConstraint(branchCfg, captures, nil)
 
 	rootFilter := FilterConfig{
 		ExcludePaths:  append(append([]string{}, s.cfg.IgnorePaths...), allComponentPaths(cfg.Components)...),

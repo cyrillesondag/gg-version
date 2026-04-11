@@ -81,7 +81,7 @@ On `release/1.x`, the version will be a full semver (e.g. `v1.4.2`), not a pre-r
 
 ## Extract information from the branch name
 
-Branch patterns are Go regular expressions with named captures. Captures are available as `{{ .regex.<name> }}`.
+Branch patterns are Go regular expressions with named captures. Captures are available as `{{ .regex.<name> }}` in both `version_format` and `constraint` templates.
 
 Example: extract the ticket number from `feat/PROJ-123-my-feature`:
 
@@ -99,6 +99,47 @@ semver:
 # On branch feat/PROJ-123-login
 gg-version next
 # → 1.3.0-PROJ-123.4
+```
+
+---
+
+## Lock a maintenance branch to a major version
+
+Use `constraint:` to restrict tag search to a wildcard semver range. This prevents a breaking change on a maintenance branch from bumping to the next major.
+
+```yaml
+semver:
+  tag_prefix: "v"
+  branches:
+    - pattern: "main"
+    - pattern: "release/(?P<major>[0-9]+)\\.x"
+      constraint: "{{ .regex.major }}.x.x"
+    - pattern: ".*"
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+```
+
+```bash
+# On branch release/1.x, even with a breaking-change commit:
+gg-version next
+# → v1.5.0   (stays in the 1.x.x range, never bumps to 2.0.0)
+
+# On branch main, the same breaking-change commit would produce:
+gg-version next
+# → v2.0.0
+```
+
+The `constraint` template is rendered with `.regex.*` captures from the branch pattern and `.var.*` flags. The result must be a wildcard semver like `1.x.x` or `1.2.x` — each component is either an integer or `x`.
+
+You can also make the constraint dynamic via `--var`:
+
+```yaml
+    - pattern: "release/.*"
+      constraint: "{{ .var.major }}.x.x"
+```
+
+```bash
+gg-version --var major=2 next
+# → v2.3.1   (only considers tags in the 2.x.x range)
 ```
 
 ---

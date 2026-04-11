@@ -88,6 +88,24 @@ For components, the logic is symmetric: a commit belongs to a component if at le
 
 ---
 
+## How version constraints work
+
+When a `constraint` field is set on a branch configuration, `gg-version` restricts which tags it considers when searching for the last tag.
+
+The `constraint` value is a Go template rendered with:
+- `.regex.*` — named captures from the matching branch pattern
+- `.var.*` — variables injected via `--var` flags
+
+The rendered result must be a wildcard semver in the form `N.N.N`, where each component is either an integer or `x` (wildcard). Examples: `1.x.x`, `2.3.x`.
+
+Only tags whose version falls within the constraint range are considered. Tags outside the range are invisible to the search, as if they did not exist.
+
+**Why this matters:** without a constraint, a `feat!:` commit on a `release/1.x` maintenance branch would cause `gg-version` to compute `2.0.0`, because the last reachable tag might be `v1.9.0` and a major bump produces `2.0.0`. With `constraint: "{{ .regex.major }}.x.x"`, the search is limited to `v1.*.*` tags, so the bump stays within the `1.x.x` range.
+
+This mechanism is explicit and intentional: you set `constraint` when you want to confine a branch to a version range. Branches without `constraint` always consider all reachable tags.
+
+---
+
 ## Component isolation in a monorepo
 
 Each component lives in its own tag namespace (`{scope}/{prefix}{version}`) and its own commit namespace (filtered by `path`).

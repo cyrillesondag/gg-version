@@ -209,7 +209,7 @@ func lastCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
-	results, err := strategy.AllLast(project, cfg)
+	results, err := strategy.AllLast(project, flags.Vars, cfg)
 	if err != nil {
 		return fmt.Errorf("computing last version: %w", err)
 	}
