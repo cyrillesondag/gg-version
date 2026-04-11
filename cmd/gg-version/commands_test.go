@@ -145,7 +145,7 @@ func writeConfig(t *testing.T, cfg config.Config) string {
 	if _, err := f.Write(b); err != nil {
 		t.Fatalf("Write config: %v", err)
 	}
-	f.Close()
+	_ = f.Close()
 	return f.Name()
 }
 
