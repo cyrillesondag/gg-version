@@ -1,55 +1,55 @@
 # gg-version
 
-> Calcule automatiquement la version de votre projet à partir de l'historique Git et des Conventional Commits — sans jamais écrire dans le dépôt.
+> Automatically computes your project version from Git history and Conventional Commits — without ever writing to the repository.
 
 ---
 
 ## Installation
 
 ```bash
-go install github.com/yourorg/gg-version@latest
+go install github.com/cyrillesondag/gg-version@latest
 ```
 
-Ou depuis les sources :
+Or from source:
 
 ```bash
-git clone https://github.com/yourorg/gg-version.git
+git clone https://github.com/cyrillesondag/gg-version.git
 cd gg-version
 go build -o gg-version .
 ```
 
 ---
 
-## Démarrage rapide
+## Quick Start
 
 ```bash
-# Version actuelle au HEAD
-gg-version current
+# Computed version at HEAD
+gg-version next
 # → v1.4.2
 
-# Dernière version taguée
+# Last tagged version
 gg-version last
 # → v1.4.1
 
-# Toutes les variables disponibles pour le formatage
+# All template variables available for formatting
 gg-version env
 ```
 
-Sans fichier de configuration, `gg-version` fonctionne avec des valeurs par défaut raisonnables.
+Without a configuration file, `gg-version` works with sensible defaults.
 
 ---
 
 ## Documentation
 
-| Document | Quand le lire |
+| Document | When to read |
 |---|---|
-| [Tutoriel](docs/tutorial.md) | Vous débutez — suivez un exemple pas à pas |
-| [Guides pratiques](docs/how-to.md) | Vous avez un objectif précis (monorepo, CI, format personnalisé…) |
-| [Référence](docs/reference.md) | Vous cherchez un flag, une option de config ou une variable de template |
-| [Concepts](docs/explanation.md) | Vous voulez comprendre le fonctionnement interne |
+| [Tutorial](docs/tutorial.md) | Getting started — follow a step-by-step example |
+| [How-to guides](docs/how-to.md) | You have a specific goal (monorepo, CI, custom format…) |
+| [Reference](docs/reference.md) | Looking for a flag, config option, or template variable |
+| [Concepts](docs/explanation.md) | You want to understand how it works internally |
 
 ---
 
-## Fonctionnement en une phrase
+## How It Works in One Sentence
 
-`gg-version` remonte l'historique Git depuis HEAD, trouve le dernier tag semver atteignable, analyse les commits intermédiaires avec les Conventional Commits, et en déduit la version courante — sans jamais créer de tag ni modifier le dépôt.
+`gg-version` walks the Git history from HEAD, finds the last reachable semver tag, analyses the commits in between using Conventional Commits, and derives the current version — without ever creating a tag or modifying the repository.

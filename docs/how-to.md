@@ -1,12 +1,12 @@
-# Guides pratiques
+# How-to guides
 
-Ces guides répondent à des objectifs précis. Choisissez celui qui correspond à votre situation.
+These guides answer specific goals. Pick the one that matches your situation.
 
 ---
 
-## Utiliser un préfixe `v` sur les tags
+## Use a `v` prefix on tags
 
-Par défaut, aucun préfixe n'est utilisé. Pour que `gg-version` reconnaisse les tags du style `v1.2.3` :
+By default no prefix is used. To make `gg-version` recognise tags like `v1.2.3`:
 
 ```yaml
 # .gg-version.yml
@@ -16,21 +16,21 @@ semver:
 
 ```bash
 git tag v1.0.0
-gg-version current
+gg-version next
 # → v1.0.0
 
-# Après un commit feat:
-gg-version current
+# After a feat: commit:
+gg-version next
 # → v1.1.0
 ```
 
 ---
 
-## Personnaliser le format des versions de pré-release
+## Customise the pre-release version format
 
-Sur les branches qui ne sont pas des releases, la version est rendue via un template Go. Par défaut : `{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}`.
+On branches that are not releases, the version is rendered via a Go template. Default: `{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}`.
 
-Pour inclure le hash court :
+To include the short hash:
 
 ```yaml
 semver:
@@ -44,27 +44,27 @@ semver:
 ```
 
 ```bash
-# Sur la branche feat/login, après un feat:
-gg-version current
+# On branch feat/login, after a feat: commit:
+gg-version next
 # → 1.3.0-a1b2c3d
 ```
 
-Autre exemple — inclure la date :
+Another example — include the date:
 
 ```yaml
 format: "{{ .semver.Semver }}-{{ .git.AuthorDate }}.{{ .git.CommitCount }}"
 ```
 
 ```bash
-gg-version current
+gg-version next
 # → 1.3.0-2026-04-06.7
 ```
 
 ---
 
-## Configurer des branches de release supplémentaires
+## Configure additional release branches
 
-Par défaut, seule `main` est une branche de release. Pour ajouter `master` et les branches `release/*` :
+By default only `main` is a release branch. To add `master` and `release/*` branches:
 
 ```yaml
 semver:
@@ -81,15 +81,15 @@ semver:
       format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
 ```
 
-Sur `release/1.x`, la version sera un semver plein (ex : `v1.4.2`), pas un pré-release.
+On `release/1.x`, the version will be a full semver (e.g. `v1.4.2`), not a pre-release.
 
 ---
 
-## Extraire des informations du nom de branche
+## Extract information from the branch name
 
-Les patterns de branche sont des expressions régulières avec capture nommée. Les captures sont disponibles dans `{{ .regex.<nom> }}`.
+Branch patterns are Go regular expressions with named captures. Captures are available as `{{ .regex.<name> }}`.
 
-Exemple : extraire le numéro de ticket depuis `feat/PROJ-123-my-feature` :
+Example: extract the ticket number from `feat/PROJ-123-my-feature`:
 
 ```yaml
 semver:
@@ -105,22 +105,22 @@ semver:
 ```
 
 ```bash
-# Sur la branche feat/PROJ-123-login
-gg-version current
+# On branch feat/PROJ-123-login
+gg-version next
 # → 1.3.0-PROJ-123.4
 ```
 
 ---
 
-## Passer des variables personnalisées au template
+## Pass custom variables to the template
 
-`--var name=value` injecte des variables accessibles via `{{ .var.name }}` :
+`--var name=value` injects variables accessible as `{{ .var.name }}`:
 
 ```bash
-gg-version --var env=staging --var region=eu-west current
+gg-version --var env=staging --var region=eu-west next
 ```
 
-Avec le format :
+With format:
 
 ```yaml
 format: "{{ .semver.Semver }}-{{ .var.env }}-{{ .git.ShortHash }}"
@@ -130,13 +130,13 @@ format: "{{ .semver.Semver }}-{{ .var.env }}-{{ .git.ShortHash }}"
 1.3.0-staging-a1b2c3d
 ```
 
-Utile pour inclure des métadonnées de build sans modifier la configuration.
+Useful for including build metadata without modifying the configuration.
 
 ---
 
-## Ignorer certains chemins de fichiers
+## Ignore certain file paths
 
-Pour exclure les commits qui ne touchent que la documentation de l'analyse de version :
+To exclude commits that only touch documentation from version analysis:
 
 ```yaml
 semver:
@@ -147,32 +147,32 @@ semver:
     - ".github/**"
 ```
 
-Un commit qui modifie uniquement `docs/tutorial.md` ne contribue pas au calcul de version. Un commit qui modifie à la fois `docs/tutorial.md` et `src/api.go` est conservé (tous les fichiers doivent correspondre pour qu'un commit soit ignoré).
+A commit that modifies only `docs/tutorial.md` does not contribute to the version. A commit that modifies both `docs/tutorial.md` and `src/api.go` is kept (all files must match for a commit to be excluded).
 
 ---
 
-## Ignorer des commits spécifiques par SHA
+## Ignore specific commits by SHA
 
-Pour exclure un commit précis (hotfix de CI, commit de merge automatique…) :
+To exclude a specific commit (CI hotfix, automatic merge commit…):
 
 ```yaml
 semver:
   ignore_commits:
-    - "a1b2c3d"      # préfixe court suffit
+    - "a1b2c3d"      # short prefix is enough
     - "deadbeef12"
 ```
 
 ```bash
-# Vérifier l'effet
+# Check the effect
 gg-version env | grep CommitCount
-# git.CommitCount=4   ← le commit ignoré n'est pas compté
+# git.CommitCount=4   ← the ignored commit is not counted
 ```
 
 ---
 
-## Utiliser gg-version dans un monorepo
+## Use gg-version in a monorepo
 
-Pour des projets où plusieurs composants sont versionnés indépendamment dans le même dépôt :
+For projects where multiple components are versioned independently in the same repository:
 
 ```yaml
 # .gg-version.yml
@@ -186,30 +186,30 @@ components:
     path: "frontend/**"
   shared:
     path: "shared/**"
-    tag_scope: "libs"   # les tags seront libs/v1.0.0 au lieu de shared/v1.0.0
+    tag_scope: "libs"   # tags will be libs/v1.0.0 instead of shared/v1.0.0
 ```
 
 ```bash
-gg-version current
+gg-version next
 # @root        v2.1.0
 # api          v0.5.0
 # frontend     v3.2.1
 # shared       v1.0.0
 ```
 
-Chaque composant est versionné à partir des commits qui touchent son répertoire. `@root` représente tout ce qui ne touche pas un composant déclaré.
+Each component is versioned from commits that touch its directory. `@root` represents everything that does not touch any declared component.
 
-Filtrer sur un seul composant :
+Filter to a single component:
 
 ```bash
-gg-version current --component api
+gg-version next --component api
 # → v0.5.0
 
-gg-version current --root
+gg-version next --root
 # → v2.1.0
 ```
 
-Lister les composants et leurs patterns de tags :
+List components and their tag patterns:
 
 ```bash
 gg-version components
@@ -220,14 +220,14 @@ gg-version components
 
 ---
 
-## Intégrer gg-version dans une pipeline CI
+## Integrate gg-version in a CI pipeline
 
 ### GitHub Actions
 
 ```yaml
 - name: Compute version
   id: version
-  run: echo "value=$(gg-version current)" >> $GITHUB_OUTPUT
+  run: echo "value=$(gg-version next)" >> $GITHUB_OUTPUT
 
 - name: Build
   run: docker build -t myapp:${{ steps.version.outputs.value }} .
@@ -238,7 +238,7 @@ gg-version components
 ```yaml
 compute-version:
   script:
-    - export APP_VERSION=$(gg-version current)
+    - export APP_VERSION=$(gg-version next)
     - echo "APP_VERSION=$APP_VERSION" >> build.env
   artifacts:
     reports:
@@ -248,7 +248,7 @@ compute-version:
 ### Makefile
 
 ```makefile
-VERSION := $(shell gg-version current)
+VERSION := $(shell gg-version next)
 
 .PHONY: build
 build:
@@ -257,15 +257,15 @@ build:
 
 ---
 
-## Injecter la version dans un binaire Go
+## Inject the version into a Go binary
 
 ```bash
-gg-version current
+gg-version next
 # v1.4.2
 ```
 
 ```makefile
-VERSION := $(shell gg-version current)
+VERSION := $(shell gg-version next)
 
 build:
 	go build -ldflags="-X main.Version=$(VERSION)" -o myapp .
@@ -287,9 +287,9 @@ make build && ./myapp
 
 ---
 
-## Déboguer le calcul de version
+## Debug version computation
 
-Quand la version affichée vous surprend, inspectez toutes les variables :
+When the displayed version surprises you, inspect all variables:
 
 ```bash
 gg-version env
@@ -316,7 +316,7 @@ semver.Patch=0
 semver.Semver=1.3.0
 ```
 
-En format JSON pour un parsing CI :
+In JSON format for CI parsing:
 
 ```bash
 gg-version env --format json
@@ -337,13 +337,12 @@ gg-version env --format json
     "Major": "1",
     "Minor": "3",
     "Patch": "0",
-    "Semver": "1.3.0",
-    ...
+    "Semver": "1.3.0"
   }
 }
 ```
 
-Vérifier la configuration effective (utile pour diagnostiquer un fichier `.gg-version.yml` mal interprété) :
+Check the effective configuration (useful to diagnose a misread `.gg-version.yml`):
 
 ```bash
 gg-version config
@@ -355,15 +354,15 @@ gg-version config
 
 ---
 
-## Travailler sur un dépôt distant ou dans un sous-répertoire
+## Work with a remote repository or a subdirectory
 
 ```bash
-# Dépôt dans un autre répertoire
-gg-version --repo /path/to/other-project current
+# Repository in another directory
+gg-version --repo /path/to/other-project next
 
-# Fichier de config dans un emplacement non standard
-gg-version --config config/versioning.yml current
+# Config file in a non-standard location
+gg-version --config config/versioning.yml next
 
-# Les deux combinés
-gg-version --repo ../backend --config ../backend/.gg-version.yml current
+# Both combined
+gg-version --repo ../backend --config ../backend/.gg-version.yml next
 ```

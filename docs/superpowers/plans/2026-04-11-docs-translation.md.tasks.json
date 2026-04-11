@@ -1,0 +1,36 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-11-docs-translation.md",
+  "tasks": [
+    {
+      "id": 104,
+      "subject": "Task 1: Translate README.md to English",
+      "status": "pending",
+      "description": "**Goal:** Replace the French README with an English version, fixing the `current` command reference and the `yourorg` placeholder URL.\n\n**Files:**\n- Modify: `README.md`\n\n**Acceptance Criteria:**\n- [ ] All prose is in English\n- [ ] `go install` URL uses `github.com/cyrillesondag/gg-version`\n- [ ] `git clone` URL uses `github.com/cyrillesondag/gg-version`\n- [ ] Quick-start shows `gg-version next`, not `gg-version current`\n- [ ] No French words remain\n\n**Verify:** `grep -ic \"current\" README.md` → 0; `grep \"yourorg\" README.md` → 0 lines\n\n```json:metadata\n{\"files\": [\"README.md\"], \"verifyCommand\": \"grep -ic \\\"current\\\" README.md && grep \\\"yourorg\\\" README.md\", \"acceptanceCriteria\": [\"All prose in English\", \"cyrillesondag URL in go install and git clone\", \"gg-version next in quick-start\", \"no French words\"]}\n```"
+    },
+    {
+      "id": 105,
+      "subject": "Task 2: Translate docs/tutorial.md to English",
+      "status": "pending",
+      "description": "**Goal:** Replace the French tutorial with an English version, replacing all `gg-version current` with `gg-version next`.\n\n**Files:**\n- Modify: `docs/tutorial.md`\n\n**Acceptance Criteria:**\n- [ ] All prose is in English\n- [ ] No `gg-version current` occurrences remain\n- [ ] `VERSION=$(gg-version next)` in the script example\n\n**Verify:** `grep \"gg-version current\" docs/tutorial.md` → 0 lines\n\n```json:metadata\n{\"files\": [\"docs/tutorial.md\"], \"verifyCommand\": \"grep \\\"gg-version current\\\" docs/tutorial.md\", \"acceptanceCriteria\": [\"All prose in English\", \"No gg-version current occurrences\", \"VERSION=$(gg-version next) in script example\"]}\n```"
+    },
+    {
+      "id": 106,
+      "subject": "Task 3: Translate docs/how-to.md to English",
+      "status": "pending",
+      "description": "**Goal:** Replace the French how-to guides with an English version, replacing all `gg-version current` with `gg-version next`.\n\n**Files:**\n- Modify: `docs/how-to.md`\n\n**Acceptance Criteria:**\n- [ ] All prose is in English\n- [ ] No `gg-version current` occurrences remain\n\n**Verify:** `grep \"gg-version current\" docs/how-to.md` → 0 lines\n\n```json:metadata\n{\"files\": [\"docs/how-to.md\"], \"verifyCommand\": \"grep \\\"gg-version current\\\" docs/how-to.md\", \"acceptanceCriteria\": [\"All prose in English\", \"No gg-version current occurrences\"]}\n```"
+    },
+    {
+      "id": 107,
+      "subject": "Task 4: Translate docs/reference.md to English",
+      "status": "pending",
+      "description": "**Goal:** Replace the French reference with an English version, removing the stale migration note about the removed `current` command.\n\n**Files:**\n- Modify: `docs/reference.md`\n\n**Acceptance Criteria:**\n- [ ] All prose is in English\n- [ ] Stale note about `current` being removed is gone\n- [ ] All tables and template variable descriptions translated\n\n**Verify:** `grep -i \"commande\\|affiche\\|défaut\" docs/reference.md` → 0 lines\n\n```json:metadata\n{\"files\": [\"docs/reference.md\"], \"verifyCommand\": \"grep -i \\\"commande|affiche|défaut\\\" docs/reference.md\", \"acceptanceCriteria\": [\"All prose in English\", \"Stale current-removed note gone\", \"All tables translated\"]}\n```"
+    },
+    {
+      "id": 108,
+      "subject": "Task 5: Translate docs/explanation.md to English",
+      "status": "pending",
+      "description": "**Goal:** Replace the French explanation document with an English version. Rename the section from `last` vs `current` to `last` vs `next`.\n\n**Files:**\n- Modify: `docs/explanation.md`\n\n**Acceptance Criteria:**\n- [ ] All prose is in English\n- [ ] Section title is \"Why `last` and `next` are different\"\n- [ ] Examples use `gg-version next`, not `gg-version current`\n\n**Verify:** `grep \"gg-version current\" docs/explanation.md` → 0 lines\n\n```json:metadata\n{\"files\": [\"docs/explanation.md\"], \"verifyCommand\": \"grep \\\"gg-version current\\\" docs/explanation.md\", \"acceptanceCriteria\": [\"All prose in English\", \"Section title uses next not current\", \"Examples use gg-version next\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-11T07:00:00Z"
+}
