@@ -34,9 +34,8 @@ type SemverConfig struct {
 }
 
 type BranchConfig struct {
-	Pattern string `yaml:"pattern"`
-	Release bool   `yaml:"release"`
-	Format  string `yaml:"format"` // ignored when Release is true
+	Pattern       string `yaml:"pattern"`
+	VersionFormat string `yaml:"version_format"` // empty = release branch; non-empty = pre-release suffix template
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -47,15 +46,11 @@ func DefaultConfig() Config {
 			TagPrefix: "",
 			Initial:   "0.1.0",
 			Branches: []BranchConfig{
+				{Pattern: "main"},
+				{Pattern: "master"},
 				{
-					Pattern: "main",
-					Release: true,
-					Format:  "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
-				},
-				{
-					Pattern: ".*",
-					Release: false,
-					Format:  "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
+					Pattern:       ".*",
+					VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
 				},
 			},
 			ConventionalCommits: ConventionalCommitsConfig{

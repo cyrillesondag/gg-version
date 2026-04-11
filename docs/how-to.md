@@ -37,10 +37,8 @@ semver:
   tag_prefix: "v"
   branches:
     - pattern: "main"
-      release: true
     - pattern: ".*"
-      release: false
-      format: "{{ .semver.Semver }}-{{ .git.ShortHash }}"
+      version_format: "{{ .semver.Semver }}-{{ .git.ShortHash }}"
 ```
 
 ```bash
@@ -52,7 +50,7 @@ gg-version next
 Another example — include the date:
 
 ```yaml
-format: "{{ .semver.Semver }}-{{ .git.AuthorDate }}.{{ .git.CommitCount }}"
+version_format: "{{ .semver.Semver }}-{{ .git.AuthorDate }}.{{ .git.CommitCount }}"
 ```
 
 ```bash
@@ -64,21 +62,17 @@ gg-version next
 
 ## Configure additional release branches
 
-By default only `main` is a release branch. To add `master` and `release/*` branches:
+By default, `main` and `master` are release branches. To add `release/*` branches:
 
 ```yaml
 semver:
   tag_prefix: "v"
   branches:
     - pattern: "main"
-      release: true
     - pattern: "master"
-      release: true
     - pattern: "release/.*"
-      release: true
     - pattern: ".*"
-      release: false
-      format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
 ```
 
 On `release/1.x`, the version will be a full semver (e.g. `v1.4.2`), not a pre-release.
@@ -95,13 +89,10 @@ Example: extract the ticket number from `feat/PROJ-123-my-feature`:
 semver:
   branches:
     - pattern: "main"
-      release: true
     - pattern: "feat/(?P<ticket>[A-Z]+-[0-9]+)-.*"
-      release: false
-      format: "{{ .semver.Semver }}-{{ .regex.ticket }}.{{ .git.CommitCount }}"
+      version_format: "{{ .semver.Semver }}-{{ .regex.ticket }}.{{ .git.CommitCount }}"
     - pattern: ".*"
-      release: false
-      format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
 ```
 
 ```bash
@@ -123,7 +114,7 @@ gg-version --var env=staging --var region=eu-west next
 With format:
 
 ```yaml
-format: "{{ .semver.Semver }}-{{ .var.env }}-{{ .git.ShortHash }}"
+version_format: "{{ .semver.Semver }}-{{ .var.env }}-{{ .git.ShortHash }}"
 ```
 
 ```

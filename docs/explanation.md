@@ -41,21 +41,21 @@ The bump is applied to the last tag's version to get the computed semver (e.g. `
 
 **If HEAD is exactly on a tag** → the version is that tag, without computation.
 
-**If the branch is a release branch** (`release: true`) → the version is `tag_prefix + semver` (e.g. `v1.3.0`). This is the version you should tag.
+**If the branch is a release branch** (no `version_format` or empty) → the version is `tag_prefix + semver` (e.g. `v1.3.0`). This is the version you should tag.
 
-**If the branch is a pre-release branch** (`release: false`) → the `format` template is rendered with all available variables. The resulting version identifies the build without claiming to be a release.
+**If the branch is a pre-release branch** (non-empty `version_format`) → the template is rendered with all available variables and appended to the tag prefix. The resulting version identifies the build without claiming to be a release.
 
 ---
 
 ## Releases vs pre-releases
 
-The `release: true / false` distinction is central.
+The `version_format` field in the branch configuration controls whether a branch is a release or a pre-release.
 
-A **release branch** (`main`, `master`, `release/x.y`…) produces clean versions ready to be tagged: `v1.3.0`. These versions are stable and mean "this code is ready to ship".
+A branch with **no `version_format`** (or an empty one) is a **release branch** (`main`, `master`, `release/x.y`…). It produces clean versions ready to be tagged: `v1.3.0`. These versions are stable and mean "this code is ready to ship".
 
-A **pre-release branch** (feature, hotfix, develop…) produces build identifiers: `1.3.0-feat/login.5`. These versions allow tracing a precise build without polluting the stable version namespace.
+A branch with a **non-empty `version_format`** is a **pre-release branch** (feature, hotfix, develop…). The template is rendered and appended to the tag prefix: `v1.3.0-feat/login.5`. These versions allow tracing a precise build without polluting the stable version namespace.
 
-The `format` template is only rendered on pre-release branches. On a release branch it is ignored.
+`semver.IsPreRelease` is `true` when the current branch has a non-empty `version_format`.
 
 ---
 
