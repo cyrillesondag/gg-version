@@ -545,7 +545,8 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	results, err := strategy.AllCurrent(p, flags.Vars, cfg)
+	extra := resolveConfigVars(cfg.Semver.Vars, flags.Vars)
+	results, err := strategy.AllCurrent(p, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing versions: %w", err)
 	}

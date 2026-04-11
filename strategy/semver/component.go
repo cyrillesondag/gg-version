@@ -245,6 +245,7 @@ func (s semverStrategy) varsCoreFromHistory(
 		},
 		"regex": regexVars,
 		"var":   varVars,
+		"env":   envMap(),
 	}, nil
 }
 
