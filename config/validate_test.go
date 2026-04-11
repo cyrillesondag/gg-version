@@ -29,7 +29,7 @@ func TestValidate_invalidInitial(t *testing.T) {
 func TestValidate_invalidBranchPattern(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Semver.Branches = []config.BranchConfig{
-		{Pattern: "(?invalid", Release: false, Format: "{{ .semver.Semver }}"},
+		{Pattern: "(?invalid", VersionFormat: "{{ .semver.Semver }}"},
 	}
 	err := config.Validate(cfg)
 	if err == nil {
@@ -43,24 +43,14 @@ func TestValidate_invalidBranchPattern(t *testing.T) {
 func TestValidate_invalidBranchFormat(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Semver.Branches = []config.BranchConfig{
-		{Pattern: "main", Release: false, Format: "{{ .Unclosed"},
+		{Pattern: "main", VersionFormat: "{{ .Unclosed"},
 	}
 	err := config.Validate(cfg)
 	if err == nil {
-		t.Fatal("expected error for invalid branch format, got nil")
+		t.Fatal("expected error for invalid branch version_format, got nil")
 	}
-	if !strings.Contains(err.Error(), "semver.branches[0].format") {
-		t.Errorf("expected mention of semver.branches[0].format, got: %v", err)
-	}
-}
-
-func TestValidate_branchFormatIgnoredWhenRelease(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.Semver.Branches = []config.BranchConfig{
-		{Pattern: "main", Release: true, Format: "{{ .Unclosed"},
-	}
-	if err := config.Validate(cfg); err != nil {
-		t.Errorf("invalid format on release branch should not be validated, got: %v", err)
+	if !strings.Contains(err.Error(), "semver.branches[0].version_format") {
+		t.Errorf("expected mention of semver.branches[0].version_format, got: %v", err)
 	}
 }
 

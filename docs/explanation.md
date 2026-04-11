@@ -1,110 +1,110 @@
-# Concepts : comment gg-version calcule les versions
+# Concepts: how gg-version computes versions
 
-Ce document explique le raisonnement derrière le fonctionnement de `gg-version`. Lisez-le si vous voulez comprendre *pourquoi* l'outil se comporte d'une certaine façon, pas juste *comment* l'utiliser.
-
----
-
-## Le principe fondamental : lire sans écrire
-
-`gg-version` ne crée jamais de tag, ne fait jamais de commit, ne modifie aucun fichier. Il lit l'historique Git et calcule ce que *devrait* être la version — la décision de poser un tag reste entièrement à vous.
-
-Cette séparation est délibérée. L'outil peut être exécuté à n'importe quel moment sans effets de bord, ce qui le rend idéal en CI : le même appel produit le même résultat que vous soyez en train de vérifier localement ou dans un pipeline.
+This document explains the reasoning behind how `gg-version` works. Read it if you want to understand *why* the tool behaves the way it does, not just *how* to use it.
 
 ---
 
-## Comment la version est calculée
+## The fundamental principle: read without writing
 
-Le calcul se déroule en trois phases.
+`gg-version` never creates a tag, never makes a commit, never modifies any file. It reads the Git history and computes what the version *should* be — the decision to create a tag remains entirely yours.
 
-### Phase 1 : trouver le dernier tag
-
-`gg-version` remonte tous les ancêtres de HEAD et identifie les tags valides (ceux qui commencent par le `tag_prefix` configuré et contiennent un semver valide). Il retient le tag **topologiquement le plus proche** — pas le plus récent dans le temps, mais celui qui est le plus proche dans le graphe de commits.
-
-Si plusieurs tags se trouvent à égale distance, le plus élevé sémantiquement est retenu.
-
-Si aucun tag n'est trouvé, la valeur `initial` est utilisée comme base (par défaut `0.1.0`).
-
-### Phase 2 : analyser les commits intermédiaires
-
-`gg-version` récupère tous les commits entre le dernier tag et HEAD (le tag lui-même exclu). Il analyse le message de chaque commit selon les règles des Conventional Commits :
-
-- Le **sujet** (première ligne) est testé contre les patterns `major`, `minor`, `patch` dans cet ordre.
-- Les **footers** (lignes après la première ligne blanche) sont également testés — c'est là que `BREAKING CHANGE:` est reconnu.
-- Un commit qui ne respecte pas le format CC est traité comme un patch (et marque `HasNonConventionalCommits=true`).
-- Un commit CC de type inconnu (ex : `docs:`, `chore:`) contribue `BumpNone` — il est reconnu mais n'augmente pas la version.
-
-Le niveau de bump final est le maximum parmi tous les commits analysés.
-
-### Phase 3 : produire la version
-
-Le bump est appliqué à la version du dernier tag pour obtenir le semver calculé (ex : `1.3.0`). Ensuite :
-
-**Si HEAD est exactement sur un tag** → la version est ce tag, sans calcul.
-
-**Si la branche est de release** (`release: true`) → la version est `tag_prefix + semver` (ex : `v1.3.0`). C'est la version que vous devriez tagger.
-
-**Si la branche est de pré-release** (`release: false`) → le template `format` est rendu avec toutes les variables disponibles. La version produite identifie le build sans prétendre être une release.
+This separation is deliberate. The tool can be run at any time with no side effects, making it ideal in CI: the same call produces the same result whether you are checking locally or inside a pipeline.
 
 ---
 
-## Releases vs pré-releases
+## How the version is computed
 
-La distinction `release: true / false` est centrale.
+The computation happens in three phases.
 
-Une **branche de release** (`main`, `master`, `release/x.y`…) produit des versions propres prêtes à être taguées : `v1.3.0`. Ces versions sont stables et signifient "ce code est prêt à être livré".
+### Phase 1: find the last tag
 
-Une **branche de pré-release** (feature, hotfix, develop…) produit des identifiants de build : `1.3.0-feat/login.5`. Ces versions permettent de tracer un build précis sans polluer l'espace des versions stables.
+`gg-version` walks all ancestors of HEAD and identifies valid tags (those that start with the configured `tag_prefix` and contain a valid semver). It keeps the **topologically closest** tag — not the most recent in time, but the closest in the commit graph.
 
-Le template `format` n'est rendu que sur les branches de pré-release. Sur une branche de release, il est ignoré.
+If multiple tags are at equal distance, the semantically highest one is kept.
+
+If no tag is found, the `initial` value is used as the base (default `0.1.0`).
+
+### Phase 2: analyse the commits in between
+
+`gg-version` retrieves all commits between the last tag and HEAD (the tag itself excluded). It analyses each commit message against the Conventional Commits rules:
+
+- The **subject** (first line) is tested against the `major`, `minor`, `patch` patterns in that order.
+- **Footers** (lines after the first blank line) are also tested — this is where `BREAKING CHANGE:` is recognised.
+- A commit that does not follow the CC format is treated as a patch (and sets `HasNonConventionalCommits=true`).
+- A CC commit of an unknown type (e.g. `docs:`, `chore:`) contributes `BumpNone` — it is recognised but does not increment the version.
+
+The final bump level is the maximum across all analysed commits.
+
+### Phase 3: produce the version
+
+The bump is applied to the last tag's version to get the computed semver (e.g. `1.3.0`). Then:
+
+**If HEAD is exactly on a tag** → the version is that tag, without computation.
+
+**If the branch is a release branch** (no `version_format` or empty) → the version is `tag_prefix + semver` (e.g. `v1.3.0`). This is the version you should tag.
+
+**If the branch is a pre-release branch** (non-empty `version_format`) → the template is rendered with all available variables and appended to the tag prefix. The resulting version identifies the build without claiming to be a release.
 
 ---
 
-## Pourquoi `last` et `current` sont différents
+## Releases vs pre-releases
 
-`gg-version last` répond à : *"Quel est le dernier tag posé ?"*
+The `version_format` field in the branch configuration controls whether a branch is a release or a pre-release.
 
-`gg-version current` répond à : *"Quelle version ce code représente-t-il ?"*
+A branch with **no `version_format`** (or an empty one) is a **release branch** (`main`, `master`, `release/x.y`…). It produces clean versions ready to be tagged: `v1.3.0`. These versions are stable and mean "this code is ready to ship".
 
-Sur un commit non tagué sur `main` avec des `feat:` depuis `v1.2.0`, les réponses sont :
+A branch with a **non-empty `version_format`** is a **pre-release branch** (feature, hotfix, develop…). The template is rendered and appended to the tag prefix: `v1.3.0-feat/login.5`. These versions allow tracing a precise build without polluting the stable version namespace.
+
+`semver.IsPreRelease` is `true` when the current branch has a non-empty `version_format`.
+
+---
+
+## Why `last` and `next` are different
+
+`gg-version last` answers: *"What is the last tag that was created?"*
+
+`gg-version next` answers: *"What version does this code represent?"*
+
+On an untagged commit on `main` with `feat:` commits since `v1.2.0`, the answers are:
 
 ```bash
-gg-version last     # v1.2.0  — le dernier tag existant
-gg-version current  # v1.3.0  — la version que devrait avoir ce code
+gg-version last     # v1.2.0  — the last existing tag
+gg-version next     # v1.3.0  — the version this code should have
 ```
 
-`last` est utile pour vérifier ce qui a été livré. `current` est utile pour nommer ce qui va être livré.
+`last` is useful for checking what was shipped. `next` is useful for naming what is going to be shipped.
 
 ---
 
-## Comment fonctionne le filtrage de chemins (monorepo)
+## How path filtering works (monorepo)
 
-Quand `ignore_paths` ou des composants sont configurés, les commits sont filtrés avant l'analyse CC.
+When `ignore_paths` or components are configured, commits are filtered before the CC analysis.
 
-La règle d'exclusion est intentionnellement stricte : un commit n'est ignoré que si **tous** ses fichiers modifiés correspondent à un pattern d'exclusion. Un commit qui touche à la fois `docs/README.md` et `src/api.go` n'est pas ignoré — il contribue à la version même si la documentation est exclue.
+The exclusion rule is intentionally strict: a commit is ignored only if **all** its modified files match an exclusion pattern. A commit that touches both `docs/README.md` and `src/api.go` is not ignored — it contributes to the version even though documentation is excluded.
 
-Cette règle évite les faux négatifs : mieux vaut sur-compter un commit que le manquer et produire une version qui sous-estime le changement réel.
+This rule avoids false negatives: it is better to over-count a commit than to miss it and produce a version that under-estimates the real change.
 
-Pour les composants, la logique est symétrique : un commit appartient à un composant si au moins un de ses fichiers correspond au `path` de ce composant (inclusion partielle).
-
----
-
-## Isolation des composants en monorepo
-
-Chaque composant vit dans son propre espace de tags (`{scope}/{prefix}{version}`) et son propre espace de commits (filtré par `path`).
-
-`@root` est le composant implicite qui représente "tout ce qui ne touche pas un composant déclaré". Ses commits sont ceux qui n'appartiennent à aucun composant. C'est utile pour versionner la configuration globale, les scripts de déploiement, ou tout code partagé qui ne mérite pas son propre composant.
-
-Conséquence importante : un commit qui touche deux composants (`api/` et `frontend/`) compte pour les deux. Ce n'est pas un bug — un changement partagé doit bien se refléter dans la version des deux composants.
+For components, the logic is symmetric: a commit belongs to a component if at least one of its files matches the component's `path` (partial inclusion).
 
 ---
 
-## Les templates Go
+## Component isolation in a monorepo
 
-Les formats de version utilisent la syntaxe standard des templates Go (`text/template`). Quelques rappels utiles :
+Each component lives in its own tag namespace (`{scope}/{prefix}{version}`) and its own commit namespace (filtered by `path`).
+
+`@root` is the implicit component that represents "everything that does not touch a declared component". Its commits are those that belong to no component. This is useful for versioning global configuration, deployment scripts, or any shared code that does not deserve its own component.
+
+Important consequence: a commit that touches two components (`api/` and `frontend/`) counts for both. This is not a bug — a shared change must be reflected in the version of both components.
+
+---
+
+## Go templates
+
+Version formats use the standard Go template syntax (`text/template`). A few useful reminders:
 
 ```
-{{ .semver.Major }}          → valeur brute
-{{ printf "%02d" .git.CommitCount }}  → formatage numérique
+{{ .semver.Major }}                       → raw value
+{{ printf "%02d" .git.CommitCount }}      → numeric formatting
 ```
 
-Les templates ont accès à toutes les variables des quatre namespaces : `semver`, `git`, `regex`, `var`. Une variable absente produit une chaîne vide sans erreur.
+Templates have access to all variables from the four namespaces: `semver`, `git`, `regex`, `var`. A missing variable produces an empty string without error.
