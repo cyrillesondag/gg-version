@@ -15,7 +15,7 @@ gg-version [global flags] next
 **Behaviour:**
 - HEAD is tagged → prints that tag
 - HEAD not tagged, release branch → prints the computed next tag (`tag_prefix + semver`)
-- HEAD not tagged, pre-release branch → renders the branch `format` template
+- HEAD not tagged, pre-release branch → renders the branch `version_format` template
 - No tag found → prints `initial`
 
 **Examples:**
@@ -29,7 +29,7 @@ gg-version next --format json
 
 # With a template variable
 gg-version --var env=staging next
-# (uses {{ .var.env }} in the format template)
+# (uses {{ .var.env }} in the version_format template)
 
 # In a monorepo — all components with computed version
 gg-version next

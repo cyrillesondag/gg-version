@@ -62,7 +62,7 @@ gg-version next
 
 ## Configure additional release branches
 
-By default only `main` is a release branch. To add `master` and `release/*` branches:
+By default, `main` and `master` are release branches. To add `release/*` branches:
 
 ```yaml
 semver:
