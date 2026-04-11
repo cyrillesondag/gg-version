@@ -236,8 +236,8 @@ func mainConfig() config.SemverConfig {
 		TagPrefix: "",
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
-			{Pattern: "^refs/heads/main$", Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+			{Pattern: "^refs/heads/main$"}, // no VersionFormat = release branch
+			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
 		},
 		ConventionalCommits: config.ConventionalCommitsConfig{
 			Format: `^\w+(?:\(.+\))?!?:`,
@@ -294,8 +294,8 @@ func TestLastRespectsMajorConstraint(t *testing.T) {
 		TagPrefix: "",
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
-			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`, Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
+			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`}, // no VersionFormat = release branch
+			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/release/1.x")
@@ -450,8 +450,8 @@ func TestVars_regexNamespace(t *testing.T) {
 		TagPrefix: "",
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
-			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`, Release: true},
-			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
+			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`}, // no VersionFormat = release branch
+			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/release/1.x")
@@ -597,7 +597,7 @@ func TestVars_semverParseFailure(t *testing.T) {
 		TagPrefix: "",
 		Initial:   "not-a-version",
 		Branches: []config.BranchConfig{
-			{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
+			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
 	p := newFakeProject(t, repo, "refs/heads/main")
@@ -743,8 +743,8 @@ func twoComponentConfig() config.Config {
 			TagPrefix: "v",
 			Initial:   "0.1.0",
 			Branches: []config.BranchConfig{
-				{Pattern: "^refs/heads/main$", Release: true},
-				{Pattern: ".*", Release: false, Format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+				{Pattern: "^refs/heads/main$"}, // no VersionFormat = release branch
+				{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
 			},
 			ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
 		},
@@ -1026,5 +1026,86 @@ func TestAllVars_singleTraversal(t *testing.T) {
 
 	if fp.commitHistoryCallCount != 1 {
 		t.Errorf("CommitHistory called %d times, want exactly 1", fp.commitHistoryCallCount)
+	}
+}
+
+func TestVars_isPreRelease(t *testing.T) {
+	t.Run("release branch has IsPreRelease=false", func(t *testing.T) {
+		repo := newRepo(t)
+		createTag(t, repo, "v1.0.0")
+		p := newFakeProject(t, repo, "refs/heads/main")
+		cfg := config.SemverConfig{
+			TagPrefix: "v",
+			Initial:   "0.1.0",
+			Branches: []config.BranchConfig{
+				{Pattern: "^refs/heads/main$"}, // no VersionFormat = release branch
+				{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+			},
+			ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+		}
+		s := semverstrategy.NewStrategy(cfg)
+		vars, err := s.Vars(p, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sv := vars["semver"].(map[string]interface{})
+		if sv["IsPreRelease"] != false {
+			t.Errorf("expected IsPreRelease=false on release branch (no VersionFormat), got %v", sv["IsPreRelease"])
+		}
+	})
+
+	t.Run("pre-release branch has IsPreRelease=true", func(t *testing.T) {
+		repo := newRepo(t)
+		createTag(t, repo, "v1.0.0")
+		createCommit(t, repo)
+		createCommit(t, repo)
+		p := newFakeProject(t, repo, "refs/heads/feature/foo")
+		cfg := config.SemverConfig{
+			TagPrefix: "v",
+			Initial:   "0.1.0",
+			Branches: []config.BranchConfig{
+				{Pattern: "^refs/heads/main$"}, // no VersionFormat = release branch
+				{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+			},
+			ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+		}
+		s := semverstrategy.NewStrategy(cfg)
+		vars, err := s.Vars(p, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sv := vars["semver"].(map[string]interface{})
+		if sv["IsPreRelease"] != true {
+			t.Errorf("expected IsPreRelease=true on pre-release branch (VersionFormat set), got %v", sv["IsPreRelease"])
+		}
+	})
+}
+
+func TestCurrent_tagPrefixPrependedOnPreRelease(t *testing.T) {
+	cfg := config.SemverConfig{
+		TagPrefix: "v",
+		Initial:   "0.1.0",
+		Branches: []config.BranchConfig{
+			{Pattern: "^refs/heads/main$"},
+			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"},
+		},
+		ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+	}
+	// non-CC commit → patch bump → semver=1.0.1
+	// version_format renders "1.0.1-feature/my-feat.1"
+	// tag_prefix "v" prepended → "v1.0.1-feature/my-feat.1"
+	repo := newRepo(t)
+	createTag(t, repo, "v1.0.0")
+	createCommit(t, repo)
+	p := newFakeProject(t, repo, "refs/heads/feature/my-feat")
+	s := semverstrategy.NewStrategy(cfg)
+
+	got, err := s.Current(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "v1.0.1-feature/my-feat.1"
+	if got != expected {
+		t.Fatalf("expected %s, got %s", expected, got)
 	}
 }

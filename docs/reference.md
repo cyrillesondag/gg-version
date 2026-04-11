@@ -1,37 +1,37 @@
-# Référence
+# Reference
 
 ---
 
-## Commandes
+## Commands
 
 ### `next`
 
-Affiche la version calculée au HEAD — qu'elle existe comme tag ou non.
+Prints the computed version at HEAD — whether or not it exists as a tag.
 
 ```
 gg-version [global flags] next
 ```
 
-**Comportement :**
-- HEAD est tagué → affiche ce tag
-- HEAD non tagué, branche de release → affiche le prochain tag calculé (`tag_prefix + semver`)
-- HEAD non tagué, branche de pré-release → rend le template `format` de la branche
-- Aucun tag trouvé → affiche `initial`
+**Behaviour:**
+- HEAD is tagged → prints that tag
+- HEAD not tagged, release branch → prints the computed next tag (`tag_prefix + semver`)
+- HEAD not tagged, pre-release branch → renders the branch `version_format` template
+- No tag found → prints `initial`
 
-**Exemples :**
+**Examples:**
 
 ```bash
 gg-version next
-# v1.5.0  (version calculée même si HEAD non tagué)
+# v1.5.0  (computed version even if HEAD is not tagged)
 
 gg-version next --format json
 # "v1.5.0"
 
-# Avec variable de template
+# With a template variable
 gg-version --var env=staging next
-# (utilise {{ .var.env }} dans le template de format)
+# (uses {{ .var.env }} in the version_format template)
 
-# En monorepo — tous les composants avec version calculée
+# In a monorepo — all components with computed version
 gg-version next
 # @root        v2.2.0
 # api          v0.6.0
@@ -42,7 +42,7 @@ gg-version next --format json
 #   "api": "v0.6.0"
 # }
 
-# Filtrer un composant
+# Filter to one component
 gg-version next --component api
 # v0.6.0
 
@@ -50,36 +50,34 @@ gg-version next --root
 # v2.2.0
 ```
 
-**Flags :**
+**Flags:**
 
-| Flag | Défaut | Description |
+| Flag | Default | Description |
 |---|---|---|
-| `--format <plain\|json>` | `plain` | Format de sortie |
-
-> **Note :** La commande `current` a été supprimée. Utilisez `next` pour obtenir la version calculée.
+| `--format <plain\|json>` | `plain` | Output format |
 
 ---
 
 ### `last`
 
-Affiche le dernier tag semver atteignable depuis HEAD.
+Prints the last semver tag reachable from HEAD.
 
 ```
 gg-version [global flags] last
 ```
 
-**Comportement :**
-- Remonte tous les ancêtres de HEAD, filtre les tags valides selon `tag_prefix`, retourne le plus proche topologiquement.
-- Aucun tag trouvé → affiche `initial`.
-- Contrairement à `next`, `last` n'analyse pas les commits : il retourne le tag tel quel, sans calculer de bump.
+**Behaviour:**
+- Walks all ancestors of HEAD, filters valid tags by `tag_prefix`, returns the topologically closest one.
+- No tag found → prints `initial`.
+- Unlike `next`, `last` does not analyse commits: it returns the tag as-is, without computing a bump.
 
-**Exemples :**
+**Examples:**
 
 ```bash
 gg-version last
 # v1.4.1
 
-# En monorepo
+# In a monorepo
 gg-version last
 # @root        v2.0.0
 # api          v0.4.0
@@ -89,30 +87,30 @@ gg-version last --component frontend
 # v2.9.0
 ```
 
-**Flags :**
+**Flags:**
 
-| Flag | Défaut | Description |
+| Flag | Default | Description |
 |---|---|---|
-| `--format <plain\|json>` | `plain` | Format de sortie |
+| `--format <plain\|json>` | `plain` | Output format |
 
 ---
 
 ### `env`
 
-Affiche toutes les variables de template disponibles.
+Prints all available template variables.
 
 ```
 gg-version [global flags] env [--format plain|json]
 ```
 
-**Comportement :**
-- En mode monorepo, affiche les variables pour chaque composant préfixées par son nom.
-- Si le dépôt ou la config est inaccessible, affiche uniquement les variables `var.*`.
+**Behaviour:**
+- In monorepo mode, prints variables for each component prefixed by its name.
+- If the repository or config is inaccessible, prints only `var.*` variables.
 
-**Exemples :**
+**Examples:**
 
 ```bash
-# Format par défaut (plain)
+# Default format (plain)
 gg-version env
 # git.AuthorDate=2026-04-06
 # git.Branch=main
@@ -135,14 +133,14 @@ gg-version env
 # semver.PreRelease=
 # semver.Semver=1.3.0
 
-# Format JSON
+# JSON format
 gg-version env --format json
 
-# Avec variable personnalisée
+# With a custom variable
 gg-version --var buildno=42 env
 # var.buildno=42
 
-# En monorepo (plain)
+# In a monorepo (plain)
 gg-version env
 # @root.git.Branch=main
 # @root.semver.Semver=2.1.0
@@ -150,7 +148,7 @@ gg-version env
 # api.semver.Semver=0.5.1
 # ...
 
-# En monorepo (JSON)
+# In a monorepo (JSON)
 gg-version env --format json
 # {
 #   "@root": { "git": {...}, "semver": {...} },
@@ -164,13 +162,13 @@ gg-version env --component api --format json
 
 ### `config`
 
-Affiche la configuration effective (valeurs par défaut + fichier `.gg-version.yml` mergé).
+Prints the effective configuration (defaults merged with `.gg-version.yml`).
 
 ```
 gg-version [global flags] config [--format yaml|json]
 ```
 
-**Exemples :**
+**Examples:**
 
 ```bash
 gg-version config
@@ -187,7 +185,7 @@ gg-version config --format json
 #   "components": { ... }
 # }
 
-# Quand aucun fichier de config n'existe
+# When no config file exists
 gg-version config
 # # default config
 # semver:
@@ -199,13 +197,13 @@ gg-version config
 
 ### `components`
 
-Liste les composants définis dans la configuration (monorepo).
+Lists the components defined in the configuration (monorepo).
 
 ```
 gg-version [global flags] components [--format plain|json]
 ```
 
-**Exemples :**
+**Examples:**
 
 ```bash
 gg-version components
@@ -226,7 +224,7 @@ gg-version components --format json
 #   }
 # }
 
-# Sans composants définis
+# With no components defined
 gg-version components
 # (no components defined)
 ```
@@ -235,13 +233,13 @@ gg-version components
 
 ### `tag`
 
-Crée un tag annoté sur HEAD avec la version `next` calculée. En monorepo, crée un tag par composant.
+Creates an annotated tag on HEAD with the computed `next` version. In a monorepo, creates one tag per component.
 
 ```
 gg-version [global flags] tag [--push] [--dry-run] [--message <msg>]
 ```
 
-**Exemples :**
+**Examples:**
 
 ```bash
 gg-version tag
@@ -258,17 +256,17 @@ gg-version tag --message "release: sprint 42"
 # created tag v2.2.0 on a1b2c3d
 ```
 
-**Flags :**
+**Flags:**
 
-| Flag | Défaut | Description |
+| Flag | Default | Description |
 |---|---|---|
-| `--push` | false | Pousse les tags vers origin après création (SSH agent) |
-| `--dry-run` | false | Affiche ce qui serait fait sans créer de tag |
-| `--message <msg>` | `"chore: release <version>"` | Message du tag annoté |
+| `--push` | false | Push tags to origin after creation (SSH agent) |
+| `--dry-run` | false | Print what would happen without creating a tag |
+| `--message <msg>` | `"chore: release <version>"` | Annotated tag message |
 
-**Comportement monorepo :**
+**Monorepo behaviour:**
 
-Sans `--component` ni `--root`, crée un tag pour chaque composant et pour `@root` :
+Without `--component` or `--root`, creates a tag for each component and for `@root`:
 
 ```bash
 gg-version tag --dry-run
@@ -277,12 +275,12 @@ gg-version tag --dry-run
 # would create tag frontend/v3.1.0 on a1b2c3d
 ```
 
-Avec `--component api` : crée uniquement le tag du composant `api`.
-Avec `--root` : crée uniquement le tag `@root`.
+With `--component api`: creates only the `api` component tag.
+With `--root`: creates only the `@root` tag.
 
-**Erreurs :**
+**Errors:**
 
-Si un tag existe déjà, la commande retourne une erreur et s'arrête :
+If a tag already exists, the command returns an error and stops:
 
 ```
 error: creating tag v2.2.0: tag already exists
@@ -292,42 +290,42 @@ error: creating tag v2.2.0: tag already exists
 
 ### `lint`
 
-Vérifie que les commits depuis le dernier tag respectent le format Conventional Commits. Retourne exit 1 si des violations sont trouvées.
+Verifies that commits since the last tag follow the Conventional Commits format. Returns exit 1 if violations are found.
 
 ```
 gg-version [global flags] lint
 ```
 
-**Comportement :**
-- Aucune violation → sortie vide, exit 0
-- Violations trouvées → liste sur stderr, exit 1
-- HEAD exactement sur un tag (aucun commit à analyser) → exit 0
-- Aucun tag dans le dépôt → exit 0 (pas de baseline)
+**Behaviour:**
+- No violations → empty output, exit 0
+- Violations found → list on stderr, exit 1
+- HEAD is exactly on a tag (no commits to analyse) → exit 0
+- No tag in the repository → exit 0 (no baseline)
 
-**Exemples :**
+**Examples:**
 
 ```bash
-# Aucune violation
+# No violations
 gg-version lint
 echo $?  # 0
 
-# Violations trouvées
+# Violations found
 gg-version lint
 # 2 commit(s) do not follow Conventional Commits since v1.2.0:
 #   a1b2c3d "WIP fix auth"
 #   def4567 "Merge pull request #42 from foo/bar"
 echo $?  # 1
 
-# En monorepo — linter uniquement les commits du composant api
+# In a monorepo — lint only the api component commits
 gg-version lint --component api
 
-# En monorepo — linter uniquement les commits @root
+# In a monorepo — lint only @root commits
 gg-version lint --root
 ```
 
-**Règle de violation :** un commit est signalé si son sujet (première ligne) ne correspond pas au pattern `format` de `conventional_commits` dans la config. Les commits CC de type inconnu (`chore:`, `style:`) sont **valides** — seul le format compte.
+**Violation rule:** a commit is flagged if its subject (first line) does not match the `format` pattern of `conventional_commits` in the config. Commits with an unknown CC type (`chore:`, `style:`) are **valid** — only the format matters.
 
-**Intégration CI :**
+**CI integration:**
 
 ```yaml
 - name: Lint commits
@@ -336,216 +334,213 @@ gg-version lint --root
 
 ---
 
-## Flags globaux
+## Global flags
 
-Ces flags s'appliquent à toutes les commandes et se placent avant le nom de la commande.
+These flags apply to all commands and are placed before the command name.
 
-| Flag | Défaut | Description |
+| Flag | Default | Description |
 |---|---|---|
-| `--config <path>` | `.gg-version.yml` | Chemin vers le fichier de configuration |
-| `--repo <path>` | `.` | Chemin vers le dépôt Git |
-| `--component <name>` | _(aucun)_ | Filtre la sortie sur un seul composant (monorepo) |
-| `--root` | `false` | Affiche uniquement le composant `@root` (monorepo) |
-| `--var <name=value>` | _(aucun)_ | Variable de template supplémentaire (répétable) |
+| `--config <path>` | `.gg-version.yml` | Path to the configuration file |
+| `--repo <path>` | `.` | Path to the Git repository |
+| `--component <name>` | _(none)_ | Filter output to one component (monorepo) |
+| `--root` | `false` | Show only the `@root` component (monorepo) |
+| `--var <name=value>` | _(none)_ | Extra template variable (repeatable) |
 
-`--component` et `--root` sont mutuellement exclusifs.
+`--component` and `--root` are mutually exclusive.
 
-> **Note shell :** `@root` contient `@`, un caractère spécial dans certains contextes shell. Utiliser `--root` (préféré) ou quoter la valeur : `--component '@root'`.
+> **Shell note:** `@root` contains `@`, a special character in some shell contexts. Use `--root` (preferred) or quote the value: `--component '@root'`.
 
 ```bash
 gg-version --repo /path/to/project --config /path/to/.gg-version.yml next
 gg-version --component api next
 gg-version --root last
-gg-version --component '@root' last  # équivalent à --root
+gg-version --component '@root' last  # equivalent to --root
 ```
 
 ---
 
-## Fichier de configuration
+## Configuration file
 
-Emplacement par défaut : `.gg-version.yml` à la racine du dépôt. Si le fichier n'existe pas, les valeurs par défaut s'appliquent.
+Default location: `.gg-version.yml` at the repository root. If the file does not exist, defaults apply.
 
-### Schéma complet
+### Full schema
 
 ```yaml
 semver:
-  # Préfixe attendu sur les tags Git. Exemple : "v" pour des tags v1.2.3.
-  # Défaut : "" (pas de préfixe)
+  # Expected prefix on Git tags. Example: "v" for tags like v1.2.3.
+  # Default: "" (no prefix)
   tag_prefix: "v"
 
-  # Version retournée quand aucun tag n'est trouvé.
-  # Défaut : "0.1.0"
+  # Version returned when no tag is found.
+  # Default: "0.1.0"
   initial: "0.1.0"
 
-  # Règles par branche. Évaluées dans l'ordre — la première qui correspond est utilisée.
+  # Branch rules. Evaluated in order — the first match is used.
   branches:
-    - pattern: "main"        # Expression régulière Go
-      release: true          # true → version de release (pas de template)
-      # format est ignoré quand release: true
-
+    - pattern: "main"        # Go regular expression; no version_format = release branch
+    - pattern: "master"
     - pattern: "release/(?P<major>[0-9]+)\\.x"
-      release: true
 
     - pattern: ".*"
-      release: false
-      # Template Go. Variables disponibles : {{ .semver.* }}, {{ .git.* }},
-      # {{ .regex.* }}, {{ .var.* }}
-      format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+      # Go template rendered as the version suffix (after tag_prefix).
+      # Available variables: {{ .semver.* }}, {{ .git.* }}, {{ .regex.* }}, {{ .var.* }}
+      # Absent or empty = release branch: output is tag_prefix + {{ .semver.Semver }}
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
 
-  # Règles de détection des Conventional Commits (expressions régulières Go).
+  # Conventional Commits detection rules (Go regular expressions).
   conventional_commits:
-    # Format général d'un commit CC. Un commit qui correspond mais n'est dans
-    # aucune liste major/minor/patch → aucun bump (BumpNone).
+    # General CC format. A commit that matches but is not in any
+    # major/minor/patch list → no bump (BumpNone).
     format: '^\w+(?:\(.+\))?!?:'
 
-    # Patterns qui déclenchent un bump MAJOR.
+    # Patterns that trigger a MAJOR bump.
     major:
-      - '^\w+(?:\(.+\))?!:'      # feat!: ou fix!:
+      - '^\w+(?:\(.+\))?!:'      # feat!: or fix!:
       - 'BREAKING[- ]CHANGE:'    # footer BREAKING CHANGE:
 
-    # Patterns qui déclenchent un bump MINOR.
+    # Patterns that trigger a MINOR bump.
     minor:
       - '^feat(?:\(.+\))?:'
 
-    # Patterns qui déclenchent un bump PATCH.
+    # Patterns that trigger a PATCH bump.
     patch:
       - '^fix(?:\(.+\))?:'
 
-  # Chemins à exclure du calcul de version (globs doublestar).
-  # Un commit est ignoré si TOUS ses fichiers modifiés correspondent à au moins
-  # un pattern. Un commit mixte (docs + code) n'est pas ignoré.
-  # Défaut : []
+  # Paths to exclude from version computation (doublestar globs).
+  # A commit is ignored if ALL its modified files match at least one pattern.
+  # A mixed commit (docs + code) is not ignored.
+  # Default: []
   ignore_paths:
     - "docs/**"
     - "*.md"
     - ".github/**"
 
-  # SHAs de commits à ignorer (préfixes acceptés).
-  # Défaut : []
+  # Commit SHAs to ignore (short prefixes accepted).
+  # Default: []
   ignore_commits:
     - "abc1234"
     - "deadbeef"
 
-# Composants pour les monorepos. Optionnel.
+# Components for monorepos. Optional.
 components:
   api:
-    # Glob des fichiers appartenant à ce composant.
+    # Glob of files belonging to this component.
     path: "api/**"
-    # Scope du tag. Défaut : le nom de la clé ("api").
-    # Les tags de ce composant seront api/v1.2.3.
+    # Tag scope. Default: the key name ("api").
+    # Tags for this component will be api/v1.2.3.
     tag_scope: "api"
 
   frontend:
     path: "frontend/**"
-    # Sans tag_scope, les tags seront frontend/v1.2.3.
+    # Without tag_scope, tags will be frontend/v1.2.3.
 ```
 
 ---
 
-## Variables de template
+## Template variables
 
-Disponibles dans le champ `format` des branches et via `gg-version env`.
+Available in the branch `version_format` field and via `gg-version env`.
 
 ### Namespace `semver`
 
 | Variable | Type | Description |
 |---|---|---|
-| `semver.Semver` | string | Version calculée par CC (ex : `1.3.0`) |
-| `semver.Major` | string | Composant major de la version calculée |
-| `semver.Minor` | string | Composant minor de la version calculée |
-| `semver.Patch` | string | Composant patch de la version calculée |
-| `semver.PreRelease` | string | Pré-release de la version calculée (souvent vide) |
-| `semver.LastVersion` | string | Version du dernier tag (sans préfixe, ex : `1.2.0`) |
-| `semver.LastMajor` | string | Major du dernier tag |
-| `semver.LastMinor` | string | Minor du dernier tag |
-| `semver.LastPatch` | string | Patch du dernier tag |
-| `semver.LastPreRelease` | string | Pré-release du dernier tag |
-| `semver.IsBreakingChange` | bool | `true` si au moins un commit MAJOR depuis le dernier tag |
-| `semver.IsPreRelease` | bool | `true` si la branche courante n'est pas de release |
-| `semver.HasNonConventionalCommits` | bool | `true` si au moins un commit ne respecte pas le format CC |
+| `semver.Semver` | string | Version computed by CC (e.g. `1.3.0`) |
+| `semver.Major` | string | Major component of the computed version |
+| `semver.Minor` | string | Minor component of the computed version |
+| `semver.Patch` | string | Patch component of the computed version |
+| `semver.PreRelease` | string | Pre-release of the computed version (usually empty) |
+| `semver.LastVersion` | string | Last tag version (without prefix, e.g. `1.2.0`) |
+| `semver.LastMajor` | string | Major of the last tag |
+| `semver.LastMinor` | string | Minor of the last tag |
+| `semver.LastPatch` | string | Patch of the last tag |
+| `semver.LastPreRelease` | string | Pre-release of the last tag |
+| `semver.IsBreakingChange` | bool | `true` if at least one MAJOR commit since the last tag |
+| `semver.IsPreRelease` | bool | `true` if the current branch has a non-empty `version_format` |
+| `semver.HasNonConventionalCommits` | bool | `true` if at least one commit does not follow the CC format |
 
 ### Namespace `git`
 
 | Variable | Type | Description |
 |---|---|---|
-| `git.Branch` | string | Nom de la branche courante |
-| `git.AuthorDate` | string | Date de l'auteur du commit HEAD (format `2006-01-02`) |
-| `git.CommitterDate` | string | Date du committer du commit HEAD (format `2006-01-02`) |
-| `git.LastTag` | string | Dernier tag trouvé (avec préfixe, ex : `v1.2.0`), vide si aucun |
-| `git.Hash` | string | Hash complet du commit HEAD |
-| `git.ShortHash` | string | 7 premiers caractères du hash |
-| `git.CommitCount` | int | Nombre de commits depuis le dernier tag |
-| `git.IsShallow`  | bool | `true` si le dépôt est un clone superficiel (`git clone --depth=N`) |
-| `git.Truncated`  | bool | `true` si l'historique a été tronqué avant d'atteindre le tag de référence |
+| `git.Branch` | string | Current branch name |
+| `git.AuthorDate` | string | Author date of the HEAD commit (format `2006-01-02`) |
+| `git.CommitterDate` | string | Committer date of the HEAD commit (format `2006-01-02`) |
+| `git.LastTag` | string | Last tag found (with prefix, e.g. `v1.2.0`), empty if none |
+| `git.Hash` | string | Full hash of the HEAD commit |
+| `git.ShortHash` | string | First 7 characters of the hash |
+| `git.CommitCount` | int | Number of commits since the last tag |
+| `git.IsShallow` | bool | `true` if the repository is a shallow clone (`git clone --depth=N`) |
+| `git.Truncated` | bool | `true` if history was truncated before reaching the reference tag |
 
 ### Namespace `regex`
 
-Captures nommées extraites du pattern de branche qui correspond. Exemple avec `(?P<ticket>[A-Z]+-[0-9]+)` :
+Named captures extracted from the matching branch pattern. Example with `(?P<ticket>[A-Z]+-[0-9]+)`:
 
 | Variable | Description |
 |---|---|
-| `regex.ticket` | Valeur capturée du groupe nommé `ticket` |
+| `regex.ticket` | Captured value of the named group `ticket` |
 
 ### Namespace `var`
 
-Variables injectées via `--var name=value` sur la ligne de commande :
+Variables injected via `--var name=value` on the command line:
 
 ```bash
 gg-version --var env=staging --var buildno=42 next
 ```
 
-Accessibles comme `{{ .var.env }}` et `{{ .var.buildno }}`.
+Accessible as `{{ .var.env }}` and `{{ .var.buildno }}`.
 
 ---
 
-## Tags en monorepo
+## Tags in a monorepo
 
-Quand des composants sont définis, chaque composant a son propre espace de tags :
+When components are defined, each component has its own tag namespace:
 
-| Composant | `tag_scope` | `tag_prefix` | Format du tag |
+| Component | `tag_scope` | `tag_prefix` | Tag format |
 |---|---|---|---|
-| `api` | `api` (défaut) | `v` | `api/v1.2.3` |
-| `frontend` | `frontend` (défaut) | `v` | `frontend/v1.2.3` |
-| `shared` | `libs` (explicite) | `v` | `libs/v0.9.0` |
+| `api` | `api` (default) | `v` | `api/v1.2.3` |
+| `frontend` | `frontend` (default) | `v` | `frontend/v1.2.3` |
+| `shared` | `libs` (explicit) | `v` | `libs/v0.9.0` |
 
-`@root` utilise le `tag_prefix` global sans scope :
+`@root` uses the global `tag_prefix` with no scope:
 
-| Composant | Format du tag |
+| Component | Tag format |
 |---|---|
 | `@root` | `v2.1.0` |
 
 ---
 
-## Règles des Conventional Commits
+## Conventional Commits rules
 
-Priorités de bump pour chaque commit :
+Bump priority for each commit:
 
-| Critère | Bump |
+| Criterion | Bump |
 |---|---|
-| Sujet ou footer correspond à un pattern `major` | MAJOR |
-| Sujet correspond à un pattern `minor` | MINOR |
-| Sujet correspond à un pattern `patch` | PATCH |
-| Sujet correspond au `format` CC mais aucun pattern | Aucun |
-| Sujet ne correspond pas au `format` CC | PATCH (+ `HasNonConventionalCommits=true`) |
+| Subject or footer matches a `major` pattern | MAJOR |
+| Subject matches a `minor` pattern | MINOR |
+| Subject matches a `patch` pattern | PATCH |
+| Subject matches the CC `format` but no pattern | None |
+| Subject does not match the CC `format` | PATCH (+ `HasNonConventionalCommits=true`) |
 
-Le bump le plus élevé parmi tous les commits depuis le dernier tag détermine la version calculée.
+The highest bump among all commits since the last tag determines the computed version.
 
 ---
 
-## Codes de sortie
+## Exit codes
 
-| Code | Signification |
+| Code | Meaning |
 |---|---|
-| `0` | Succès |
-| `1` | Erreur (dépôt introuvable, config invalide, flag inconnu…) ou violations `lint` trouvées |
+| `0` | Success |
+| `1` | Error (repository not found, invalid config, unknown flag…) or `lint` violations found |
 
-> **Note `lint` :** `gg-version lint` retourne `1` quand des commits non-CC sont détectés — ce n'est pas une erreur outil mais le résultat normal d'un contrôle qualité. Les erreurs infrastructure (config manquante, dépôt introuvable) retournent également `1`, mais avec un message d'erreur sur stderr.
+> **`lint` note:** `gg-version lint` returns `1` when non-CC commits are detected — this is the normal result of a quality check, not a tool error. Infrastructure errors (missing config, repository not found) also return `1`, but with an error message on stderr.
 
 ---
 
 ## Shell completion
 
-`gg-version` supporte la completion shell native pour bash, zsh, fish et PowerShell via la sous-commande `completion`.
+`gg-version` supports native shell completion for bash, zsh, fish, and PowerShell via the `completion` sub-command.
 
 ### Installation
 
@@ -571,11 +566,11 @@ gg-version completion fish > ~/.config/fish/completions/gg-version.fish
 gg-version completion pwsh >> $PROFILE
 ```
 
-### Génération du script
+### Generating the script
 
 ```bash
-gg-version completion bash # script bash
-gg-version completion zsh  # script zsh
-gg-version completion fish # script fish
-gg-version completion pwsh # script PowerShell
+gg-version completion bash # bash script
+gg-version completion zsh  # zsh script
+gg-version completion fish # fish script
+gg-version completion pwsh # PowerShell script
 ```

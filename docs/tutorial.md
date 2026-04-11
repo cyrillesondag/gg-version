@@ -1,61 +1,61 @@
-# Tutoriel : votre première version automatique
+# Tutorial: your first automatic version
 
-Dans ce tutoriel, vous allez configurer `gg-version` sur un dépôt Git réel et obtenir votre premier numéro de version calculé automatiquement. Aucune connaissance préalable n'est requise.
+In this tutorial you will configure `gg-version` on a real Git repository and get your first automatically computed version number. No prior knowledge is required.
 
-**Ce que vous obtiendrez à la fin :** une commande utilisable dans votre pipeline CI qui affiche `v1.2.3` (ou la version appropriée) à chaque build.
-
----
-
-## Prérequis
-
-- `gg-version` installé (`go install` ou binaire téléchargé)
-- Un dépôt Git avec au moins un commit
+**What you will have at the end:** a command usable in your CI pipeline that prints `v1.2.3` (or the appropriate version) on every build.
 
 ---
 
-## Étape 1 — Vérifier que gg-version voit votre dépôt
+## Prerequisites
 
-Depuis la racine de votre dépôt :
+- `gg-version` installed (`go install` or downloaded binary)
+- A Git repository with at least one commit
+
+---
+
+## Step 1 — Check that gg-version sees your repository
+
+From the root of your repository:
 
 ```bash
-gg-version current
+gg-version next
 ```
 
-Résultat attendu si vous n'avez aucun tag :
+Expected result if you have no tags:
 
 ```
 0.1.0
 ```
 
-C'est la version initiale par défaut. L'outil fonctionne déjà sans aucune configuration.
+This is the default initial version. The tool works out of the box with no configuration.
 
 ---
 
-## Étape 2 — Créer votre premier tag de version
+## Step 2 — Create your first version tag
 
-`gg-version` lit les tags Git existants. Créez votre point de départ :
+`gg-version` reads existing Git tags. Create your starting point:
 
 ```bash
 git tag v1.0.0
 ```
 
-Vérifiez que l'outil le reconnaît :
+Verify that the tool recognises it:
 
 ```bash
-gg-version current
+gg-version next
 ```
 
 ```
 v1.0.0
 ```
 
-`gg-version` confirme que HEAD pointe sur un commit tagué — la version courante est exactement ce tag.
+`gg-version` confirms that HEAD points to a tagged commit — the computed version is exactly that tag.
 
 ---
 
-## Étape 3 — Ajouter des commits et observer l'évolution
+## Step 3 — Add commits and observe the evolution
 
-Faites quelques commits après le tag. Utilisez le format Conventional Commits :
+Make a few commits after the tag. Use the Conventional Commits format:
 
 ```bash
 echo "change" >> README.md
@@ -67,27 +67,27 @@ git add feature.txt
 git commit -m "feat: add feature.txt"
 ```
 
-Relancez :
+Run again:
 
 ```bash
-gg-version current
+gg-version next
 ```
 
 ```
 v1.1.0
 ```
 
-`gg-version` a analysé les deux commits :
-- `fix:` → bump de patch
-- `feat:` → bump de minor (écrase le patch)
+`gg-version` analysed the two commits:
+- `fix:` → patch bump
+- `feat:` → minor bump (overrides the patch)
 
-Le résultat est `v1.1.0`, le prochain tag qui devrait être posé.
+The result is `v1.1.0`, the next tag that should be created.
 
 ---
 
-## Étape 4 — Créer un fichier de configuration
+## Step 4 — Create a configuration file
 
-Sans configuration, le préfixe de tag est vide. La plupart des projets utilisent `v`. Créez `.gg-version.yml` à la racine :
+Without configuration, the tag prefix is empty. Most projects use `v`. Create `.gg-version.yml` at the root:
 
 ```yaml
 semver:
@@ -95,7 +95,7 @@ semver:
   initial: "0.1.0"
 ```
 
-Vérifiez la configuration chargée :
+Verify the loaded configuration:
 
 ```bash
 gg-version config
@@ -108,19 +108,17 @@ semver:
   initial: "0.1.0"
   branches:
     - pattern: main
-      release: true
-      format: ""
+    - pattern: master
     - pattern: .*
-      release: false
-      format: '{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}'
+      version_format: '{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}'
   ...
 ```
 
 ---
 
-## Étape 5 — Observer le comportement sur une branche de feature
+## Step 5 — Observe the behaviour on a feature branch
 
-Créez une branche :
+Create a branch:
 
 ```bash
 git checkout -b feat/my-feature
@@ -130,46 +128,46 @@ git commit -m "feat: add work"
 ```
 
 ```bash
-gg-version current
+gg-version next
 ```
 
 ```
 1.2.0-feat/my-feature.1
 ```
 
-Sur une branche qui n'est pas `main`, `gg-version` génère un identifiant de pré-release avec le nom de branche et le nombre de commits.
+On a branch that is not `main`, `gg-version` generates a pre-release identifier with the branch name and the commit count.
 
 ---
 
-## Étape 6 — Utiliser la version dans un script
+## Step 6 — Use the version in a script
 
 ```bash
-VERSION=$(gg-version current)
+VERSION=$(gg-version next)
 echo "Building version $VERSION"
 docker build -t myapp:$VERSION .
 ```
 
-Sur `main` :
+On `main`:
 ```
 Building version v1.2.0
 ```
 
-Sur une feature branch :
+On a feature branch:
 ```
 Building version 1.2.0-feat/my-feature.1
 ```
 
 ---
 
-## Récapitulatif
+## Summary
 
-Vous avez appris à :
+You have learned to:
 
-1. Obtenir une version sans configuration
-2. Ancrer une version avec un tag Git
-3. Observer comment les Conventional Commits font évoluer la version
-4. Créer un fichier de configuration minimal
-5. Observer la différence entre une branche de release et une branche de feature
-6. Capturer la version dans un script CI
+1. Get a version with no configuration
+2. Anchor a version with a Git tag
+3. Observe how Conventional Commits evolve the version
+4. Create a minimal configuration file
+5. See the difference between a release branch and a feature branch
+6. Capture the version in a CI script
 
-**Prochaine étape :** consultez les [guides pratiques](how-to.md) pour des scénarios spécifiques, ou la [référence](reference.md) pour l'exhaustivité des options.
+**Next step:** see the [how-to guides](how-to.md) for specific scenarios, or the [reference](reference.md) for the full list of options.

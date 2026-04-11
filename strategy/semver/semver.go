@@ -288,7 +288,7 @@ func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefi
 			"LastPatch":                 lastPatch,
 			"LastPreRelease":            lastPreRelease,
 			"IsBreakingChange":          bumpLevel == BumpMajor,
-			"IsPreRelease":              !branchCfg.Release,
+			"IsPreRelease":              branchCfg.VersionFormat != "",
 			"HasNonConventionalCommits": hasNonCC,
 		},
 		"git": map[string]interface{}{
@@ -345,21 +345,15 @@ func (s semverStrategy) Current(p GitProject, extra map[string]string) (string, 
 		return "", err
 	}
 
-	semverMap, ok := vars["semver"].(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("internal error: semver namespace missing from Vars output")
+	versionFormat := branchCfg.VersionFormat
+	if versionFormat == "" {
+		versionFormat = "{{ .semver.Semver }}"
 	}
-
-	if branchCfg.Release {
-		// Return CC-calculated version with prefix (consistent with tag format)
-		semverStr, ok := semverMap["Semver"].(string)
-		if !ok {
-			return "", fmt.Errorf("internal error: semver.Semver is not a string")
-		}
-		return s.cfg.TagPrefix + semverStr, nil
+	suffix, err := renderTemplate(versionFormat, vars)
+	if err != nil {
+		return "", err
 	}
-
-	return renderTemplate(branchCfg.Format, vars)
+	return s.cfg.TagPrefix + suffix, nil
 }
 
 // matchBranch finds the first BranchConfig whose Pattern matches branchName.
@@ -384,8 +378,7 @@ func (s semverStrategy) matchBranch(branchName string) (config.BranchConfig, map
 		return b, captures
 	}
 	return config.BranchConfig{
-		Release: false,
-		Format:  "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
+		VersionFormat: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}",
 	}, map[string]string{}
 }
 
