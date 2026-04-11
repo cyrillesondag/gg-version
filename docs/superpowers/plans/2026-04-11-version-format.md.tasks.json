@@ -1,0 +1,26 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-11-version-format.md",
+  "tasks": [
+    {
+      "id": 115,
+      "subject": "Task 1: Update config layer",
+      "status": "done",
+      "description": "**Goal:** Remove `Release bool` and rename `Format → VersionFormat` in `BranchConfig`; update `DefaultConfig()` to add `master` pattern and use new field; update `validate.go`; rewrite affected tests.\n\n**Files:**\n- Modify: `config/config.go`\n- Modify: `config/validate.go`\n- Modify: `config/config_test.go`\n- Modify: `config/validate_test.go`\n\n**Acceptance Criteria:**\n- [ ] `BranchConfig` has no `Release` field, uses `VersionFormat string \\`yaml:\"version_format\"\\``\n- [ ] `DefaultConfig()` returns 3 branches: `main`, `master` (no `version_format`), `.*` with template\n- [ ] `validate.go` validates `version_format` template syntax (not `format`)\n- [ ] All config tests pass\n\n**Verify:** `go test ./config/... -v` → all tests PASS\n\n```json:metadata\n{\"files\": [\"config/config.go\", \"config/validate.go\", \"config/config_test.go\", \"config/validate_test.go\"], \"verifyCommand\": \"go test ./config/... -v\", \"acceptanceCriteria\": [\"BranchConfig has no Release field, uses VersionFormat string\", \"DefaultConfig returns 3 branches: main, master, .*\", \"validate.go validates version_format template syntax\", \"All config tests pass\"]}\n```"
+    },
+    {
+      "id": 116,
+      "subject": "Task 2: Update strategy layer",
+      "status": "done",
+      "blockedBy": [115],
+      "description": "**Goal:** Update `semver.go` to use `VersionFormat` instead of `Release`/`Format`; update `matchBranch()` fallback; update all test fixtures; add new tests.\n\n**Files:**\n- Modify: `strategy/semver/semver.go`\n- Modify: `strategy/semver/semver_test.go`\n\n**Acceptance Criteria:**\n- [ ] `Current()` uses `versionFormat == \"\"` check (not `branchCfg.Release`)\n- [ ] `Current()` always prepends `tagPrefix` to rendered output\n- [ ] `varsCore()` sets `IsPreRelease = branchCfg.VersionFormat != \"\"`\n- [ ] `matchBranch()` fallback uses `VersionFormat` field\n- [ ] `TestVars_isPreRelease` and `TestCurrent_tagPrefixPrependedOnPreRelease` pass\n- [ ] All strategy tests pass\n\n**Verify:** `go test ./strategy/semver/... -v` → all tests PASS\n\n```json:metadata\n{\"files\": [\"strategy/semver/semver.go\", \"strategy/semver/semver_test.go\"], \"verifyCommand\": \"go test ./strategy/semver/... -v\", \"acceptanceCriteria\": [\"Current() uses versionFormat == \\\"\\\" check\", \"Current() always prepends tagPrefix\", \"varsCore() sets IsPreRelease = branchCfg.VersionFormat != \\\"\\\"\", \"matchBranch() fallback uses VersionFormat\", \"New tests TestVars_isPreRelease and TestCurrent_tagPrefixPrependedOnPreRelease pass\", \"All strategy tests pass\"]}\n```"
+    },
+    {
+      "id": 117,
+      "subject": "Task 3: Update documentation",
+      "status": "done",
+      "blockedBy": [116],
+      "description": "**Goal:** Update all doc examples that reference the old `release:`/`format:` YAML fields to use `version_format:` instead.\n\n**Files:**\n- Modify: `docs/reference.md`\n- Modify: `docs/how-to.md`\n- Modify: `docs/tutorial.md`\n- Modify: `docs/explanation.md`\n\n**Acceptance Criteria:**\n- [ ] `docs/reference.md` config schema shows `version_format` (no `release`, no `format`)\n- [ ] `docs/how-to.md` all branch config examples use `version_format`\n- [ ] `docs/tutorial.md` step 4 config uses `version_format`\n- [ ] `docs/explanation.md` \"Releases vs pre-releases\" section updated to reflect new semantics\n\n**Verify:** Manual review — no occurrence of `release: true`, `release: false`, or `format:` in docs YAML examples\n\n```json:metadata\n{\"files\": [\"docs/reference.md\", \"docs/how-to.md\", \"docs/tutorial.md\", \"docs/explanation.md\"], \"verifyCommand\": \"grep -rn 'release: true\\\\|release: false\\\\|format:' docs/ || echo 'Clean'\", \"acceptanceCriteria\": [\"reference.md config schema shows version_format\", \"how-to.md all branch config examples use version_format\", \"tutorial.md step 4 config uses version_format\", \"explanation.md Releases vs pre-releases section updated\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-11T00:00:00Z"
+}

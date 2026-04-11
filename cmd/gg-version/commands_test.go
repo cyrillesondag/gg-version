@@ -122,7 +122,7 @@ func captureOutput(t *testing.T, fn func()) string {
 	done := make(chan struct{})
 	var buf bytes.Buffer
 	go func() {
-		buf.ReadFrom(r)
+		_, _ = buf.ReadFrom(r)
 		close(done)
 	}()
 	fn()
@@ -158,7 +158,7 @@ func testConfig() config.Config {
 			TagPrefix: "",
 			Initial:   "0.1.0",
 			Branches: []config.BranchConfig{
-				{Pattern: ".*", Release: true},
+				{Pattern: ".*"}, // no VersionFormat = release branch
 			},
 			ConventionalCommits: config.ConventionalCommitsConfig{
 				Format: `^\w+(?:\(.+\))?!?:`,
@@ -586,7 +586,7 @@ func TestTagCmd(t *testing.T) {
 		// Verify no new tag was created
 		tags, _ := r.Tags()
 		count := 0
-		tags.ForEach(func(_ *plumbing.Reference) error { count++; return nil })
+		_ = tags.ForEach(func(_ *plumbing.Reference) error { count++; return nil })
 		if count != 1 {
 			t.Errorf("expected 1 tag after dry-run, got %d", count)
 		}
