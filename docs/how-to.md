@@ -144,6 +144,46 @@ gg-version --var major=2 next
 
 ---
 
+## Use environment variables in version templates
+
+All OS environment variables are available as `{{ .env.<NAME> }}` in `version_format`, `constraint`, and `vars:` values.
+
+**Direct use in `version_format`:**
+
+```yaml
+semver:
+  branches:
+    - pattern: "main"
+      version_format: "{{ .semver.Semver }}+{{ .env.CI_BUILD_NUMBER }}"
+```
+
+**Define defaults in config, override via env or `--var`:**
+
+```yaml
+semver:
+  vars:
+    stream: '{{ .env.STREAM | default "1" }}'
+    build:  "{{ .env.CI_BUILD_NUMBER }}"
+  branches:
+    - pattern: "main"
+      constraint: "{{ .var.stream }}.x.x"
+      version_format: "{{ .semver.Semver }}+{{ .var.build }}"
+    - pattern: ".*"
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+```
+
+```bash
+# STREAM=2 in env → locks to major 2; build from CI_BUILD_NUMBER
+STREAM=2 CI_BUILD_NUMBER=456 gg-version next
+# → 2.1.0+456
+
+# --var always wins over config vars and env
+gg-version --var stream=3 next
+# → 3.0.0
+```
+
+---
+
 ## Pass custom variables to the template
 
 `--var name=value` injects variables accessible as `{{ .var.name }}`:
