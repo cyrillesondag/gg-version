@@ -179,7 +179,7 @@ func TestVarsCoreFromHistory(t *testing.T) {
 	cfg := config.SemverConfig{
 		TagPrefix: "",
 		Initial:   "0.1.0",
-		Branches:  []config.BranchConfig{{Pattern: ".*", Release: true}},
+		Branches:  []config.BranchConfig{{Pattern: ".*"}},
 		ConventionalCommits: config.ConventionalCommitsConfig{
 			Format: `^\w+(?:\(.+\))?!?:`,
 			Minor:  []string{`^feat(?:\(.+\))?:`},
@@ -238,7 +238,7 @@ func lintConfig() config.SemverConfig {
 	return config.SemverConfig{
 		TagPrefix: "",
 		Initial:   "0.1.0",
-		Branches:  []config.BranchConfig{{Pattern: ".*", Release: true}},
+		Branches:  []config.BranchConfig{{Pattern: ".*"}},
 		ConventionalCommits: config.ConventionalCommitsConfig{
 			Format: `^\w+(?:\(.+\))?!?:`,
 		},

@@ -158,7 +158,7 @@ func testConfig() config.Config {
 			TagPrefix: "",
 			Initial:   "0.1.0",
 			Branches: []config.BranchConfig{
-				{Pattern: ".*", Release: true},
+				{Pattern: ".*"}, // no VersionFormat = release branch
 			},
 			ConventionalCommits: config.ConventionalCommitsConfig{
 				Format: `^\w+(?:\(.+\))?!?:`,

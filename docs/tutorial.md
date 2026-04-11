@@ -108,11 +108,9 @@ semver:
   initial: "0.1.0"
   branches:
     - pattern: main
-      release: true
-      format: ""
+    - pattern: master
     - pattern: .*
-      release: false
-      format: '{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}'
+      version_format: '{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}'
   ...
 ```
 

@@ -377,18 +377,15 @@ semver:
 
   # Branch rules. Evaluated in order — the first match is used.
   branches:
-    - pattern: "main"        # Go regular expression
-      release: true          # true → release version (no template)
-      # format is ignored when release: true
-
+    - pattern: "main"        # Go regular expression; no version_format = release branch
+    - pattern: "master"
     - pattern: "release/(?P<major>[0-9]+)\\.x"
-      release: true
 
     - pattern: ".*"
-      release: false
-      # Go template. Available variables: {{ .semver.* }}, {{ .git.* }},
-      # {{ .regex.* }}, {{ .var.* }}
-      format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+      # Go template rendered as the version suffix (after tag_prefix).
+      # Available variables: {{ .semver.* }}, {{ .git.* }}, {{ .regex.* }}, {{ .var.* }}
+      # Absent or empty = release branch: output is tag_prefix + {{ .semver.Semver }}
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
 
   # Conventional Commits detection rules (Go regular expressions).
   conventional_commits:
@@ -442,7 +439,7 @@ components:
 
 ## Template variables
 
-Available in the branch `format` field and via `gg-version env`.
+Available in the branch `version_format` field and via `gg-version env`.
 
 ### Namespace `semver`
 
@@ -459,7 +456,7 @@ Available in the branch `format` field and via `gg-version env`.
 | `semver.LastPatch` | string | Patch of the last tag |
 | `semver.LastPreRelease` | string | Pre-release of the last tag |
 | `semver.IsBreakingChange` | bool | `true` if at least one MAJOR commit since the last tag |
-| `semver.IsPreRelease` | bool | `true` if the current branch is not a release branch |
+| `semver.IsPreRelease` | bool | `true` if the current branch has a non-empty `version_format` |
 | `semver.HasNonConventionalCommits` | bool | `true` if at least one commit does not follow the CC format |
 
 ### Namespace `git`
