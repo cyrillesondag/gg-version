@@ -380,6 +380,10 @@ semver:
     - pattern: "main"        # Go regular expression; no version_format = release branch
     - pattern: "master"
     - pattern: "release/(?P<major>[0-9]+)\\.x"
+      # Restrict tag search to tags matching the rendered wildcard semver.
+      # Available: {{ .regex.* }} (branch captures), {{ .var.* }} (--var flags).
+      # Format: N.N.N where each component is an integer or x (wildcard).
+      constraint: "{{ .regex.major }}.x.x"
 
     - pattern: ".*"
       # Go template rendered as the version suffix (after tag_prefix).
