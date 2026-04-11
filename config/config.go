@@ -36,6 +36,7 @@ type SemverConfig struct {
 type BranchConfig struct {
 	Pattern       string `yaml:"pattern"`
 	VersionFormat string `yaml:"version_format"` // empty = release branch; non-empty = pre-release suffix template
+	Constraint    string `yaml:"constraint"`     // wildcard semver template, e.g. "{{ .regex.major }}.x.x"
 }
 
 // DefaultConfig returns a Config with sensible defaults.

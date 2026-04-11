@@ -152,6 +152,20 @@ func TestLoad_invalidConfig(t *testing.T) {
 	}
 }
 
+func TestValidate_invalidBranchConstraint(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Semver.Branches = []config.BranchConfig{
+		{Pattern: "main", Constraint: "{{ .Unclosed"},
+	}
+	err := config.Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid branch constraint, got nil")
+	}
+	if !strings.Contains(err.Error(), "semver.branches[0].constraint") {
+		t.Errorf("expected mention of semver.branches[0].constraint, got: %v", err)
+	}
+}
+
 func TestValidate_multipleViolations(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Semver.Initial = "bad"

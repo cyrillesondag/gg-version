@@ -33,6 +33,11 @@ func Validate(cfg Config) error {
 				add(fmt.Sprintf("semver.branches[%d].version_format %q: %v", i, b.VersionFormat, err))
 			}
 		}
+		if b.Constraint != "" {
+			if _, err := template.New("").Parse(b.Constraint); err != nil {
+				add(fmt.Sprintf("semver.branches[%d].constraint %q: %v", i, b.Constraint, err))
+			}
+		}
 	}
 
 	// semver.conventional_commits.format

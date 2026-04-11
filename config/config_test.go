@@ -200,6 +200,33 @@ semver:
 	}
 }
 
+func TestLoadBranchConstraint(t *testing.T) {
+	content := `
+semver:
+  tag_prefix: "v"
+  branches:
+    - pattern: "release/(?P<major>[0-9]+)\\.x"
+      constraint: "{{ .regex.major }}.x.x"
+    - pattern: ".*"
+      version_format: "{{ .semver.Semver }}-{{ .git.Branch }}.{{ .git.CommitCount }}"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".gg-version.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Semver.Branches[0].Constraint != "{{ .regex.major }}.x.x" {
+		t.Errorf("expected constraint %q, got %q", "{{ .regex.major }}.x.x", cfg.Semver.Branches[0].Constraint)
+	}
+	if cfg.Semver.Branches[0].VersionFormat != "" {
+		t.Errorf("expected VersionFormat empty on constrained release branch, got %q", cfg.Semver.Branches[0].VersionFormat)
+	}
+}
+
 func TestDefaultConfig_noComponents(t *testing.T) {
 	cfg := config.DefaultConfig()
 	if len(cfg.Components) != 0 {
