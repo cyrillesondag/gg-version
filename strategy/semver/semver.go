@@ -109,10 +109,10 @@ type ComponentLintResult struct {
 // Use NewStrategy to obtain an instance.
 type Strategy interface {
 	Current(p GitProject, extra map[string]string) (string, error)
-	Last(p GitProject) (string, error)
+	Last(p GitProject, extra map[string]string) (string, error)
 	Vars(p GitProject, extra map[string]string) (map[string]interface{}, error)
 	AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
-	AllLast(p GitProject, cfg config.Config) ([]ComponentResult, error)
+	AllLast(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
 	AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error)
 	AllLint(p GitProject, cfg config.Config) ([]ComponentLintResult, error)
 }
@@ -132,14 +132,14 @@ func NewStrategy(cfg config.SemverConfig) Strategy {
 // Last returns the last valid semver tag reachable from HEAD, respecting any
 // version constraints extracted from the branch name pattern. Returns cfg.Initial
 // when no tag is found.
-func (s semverStrategy) Last(p GitProject) (string, error) {
+func (s semverStrategy) Last(p GitProject, extra map[string]string) (string, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", fmt.Errorf("getting branch name: %w", err)
 	}
 
 	branchCfg, captures := s.matchBranch(branchName)
-	constraints := resolveConstraint(branchCfg, captures, nil)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 	f := NewSemverFormat(s.cfg.TagPrefix, constraints)
 
 	tag, err := p.LastTag(f)
@@ -400,7 +400,7 @@ func ParseWildcardConstraint(s string) (map[string]string, error) {
 		if p == "x" {
 			continue
 		}
-		if _, err := strconv.Atoi(p); err != nil {
+		if n, err := strconv.Atoi(p); err != nil || n < 0 {
 			return nil, fmt.Errorf("constraint %q: component %q must be a non-negative integer or 'x'", s, p)
 		}
 		result[keys[i]] = p

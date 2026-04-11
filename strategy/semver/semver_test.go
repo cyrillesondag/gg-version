@@ -258,7 +258,7 @@ func TestLastReturnsInitialWhenNoTag(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
-	got, err := s.Last(p)
+	got, err := s.Last(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestLastReturnsLastTag(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/main")
 	s := semverstrategy.NewStrategy(mainConfig())
 
-	got, err := s.Last(p)
+	got, err := s.Last(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestLastRespectsMajorConstraint(t *testing.T) {
 	p := newFakeProject(t, repo, "refs/heads/release/1.x")
 	s := semverstrategy.NewStrategy(cfg)
 
-	got, err := s.Last(p)
+	got, err := s.Last(p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,9 +357,12 @@ func TestParseWildcardConstraint(t *testing.T) {
 		{"1.x.x", map[string]string{"major": "1"}, false},
 		{"1.2.x", map[string]string{"major": "1", "minor": "2"}, false},
 		{"1.2.3", map[string]string{"major": "1", "minor": "2", "patch": "3"}, false},
+		{"0.x.x", map[string]string{"major": "0"}, false},
 		{"bad", nil, true},
 		{"a.x.x", nil, true},
 		{"1.x", nil, true},
+		{"-1.x.x", nil, true},   // negative integer rejected
+		{"1.2.3.4", nil, true},  // 4 components: "3.4" fails Atoi
 	}
 	for _, tc := range cases {
 		got, err := semverstrategy.ParseWildcardConstraint(tc.input)
@@ -881,7 +884,7 @@ func TestAllLast_withComponents(t *testing.T) {
 	cfg := twoComponentConfig()
 	s := semverstrategy.NewStrategy(cfg.Semver)
 
-	results, err := s.AllLast(p, cfg)
+	results, err := s.AllLast(p, nil, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1056,7 +1059,7 @@ func TestAllLast_singleTraversal(t *testing.T) {
 	}
 
 	s := semverstrategy.NewStrategy(cfg.Semver)
-	results, err := s.AllLast(fp, cfg)
+	results, err := s.AllLast(fp, nil, cfg)
 	if err != nil {
 		t.Fatalf("AllLast: %v", err)
 	}
