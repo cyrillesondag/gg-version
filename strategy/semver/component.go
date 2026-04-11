@@ -229,7 +229,7 @@ func (s semverStrategy) varsCoreFromHistory(
 			"LastPatch":                 lastPatch,
 			"LastPreRelease":            lastPreRelease,
 			"IsBreakingChange":          bumpLevel == BumpMajor,
-			"IsPreRelease":              !branchCfg.Release,
+			"IsPreRelease":              branchCfg.VersionFormat != "",
 			"HasNonConventionalCommits": hasNonCC,
 		},
 		"git": map[string]interface{}{
@@ -507,11 +507,6 @@ func (s semverStrategy) currentFromVars(p GitProject, vars map[string]interface{
 	}
 	branchCfg, _ := s.matchBranch(branchName)
 
-	semverMap, ok := vars["semver"].(map[string]interface{})
-	if !ok {
-		return "", false, fmt.Errorf("internal error: semver namespace missing")
-	}
-
 	gitMap, ok := vars["git"].(map[string]interface{})
 	if !ok {
 		return "", false, fmt.Errorf("internal error: git namespace missing")
@@ -531,14 +526,13 @@ func (s semverStrategy) currentFromVars(p GitProject, vars map[string]interface{
 		return s.cfg.Initial, false, nil
 	}
 
-	semverStr, ok := semverMap["Semver"].(string)
-	if !ok {
-		return "", false, fmt.Errorf("internal error: semver.Semver is not a string")
+	versionFormat := branchCfg.VersionFormat
+	if versionFormat == "" {
+		versionFormat = "{{ .semver.Semver }}"
 	}
-
-	if branchCfg.Release {
-		return tagPrefix + semverStr, false, nil
+	v, err := renderTemplate(versionFormat, vars)
+	if err != nil {
+		return "", false, err
 	}
-	v, err := renderTemplate(branchCfg.Format, vars)
-	return v, false, err
+	return tagPrefix + v, false, nil
 }
