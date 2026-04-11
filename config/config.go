@@ -31,6 +31,7 @@ type SemverConfig struct {
 	ConventionalCommits ConventionalCommitsConfig `yaml:"conventional_commits"`
 	IgnorePaths         []string                  `yaml:"ignore_paths"`
 	IgnoreCommits       []string                  `yaml:"ignore_commits"`
+	Vars                map[string]string         `yaml:"vars"` // values are Go templates rendered with .env.*
 }
 
 type BranchConfig struct {
