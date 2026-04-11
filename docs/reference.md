@@ -425,6 +425,15 @@ semver:
     - "abc1234"
     - "deadbeef"
 
+  # vars: default values for the .var.* template namespace.
+  # Each value is a Go template rendered with .env.* (OS env vars) available.
+  # CLI --var flags override config vars. The "default" pipe function is available.
+  # Default: {}
+  vars:
+    stream: '{{ .env.STREAM | default "1" }}'
+    build:  "{{ .env.CI_BUILD_NUMBER }}"
+    env:    "prod"
+
 # Components for monorepos. Optional.
 components:
   api:
@@ -494,6 +503,28 @@ gg-version --var env=staging --var buildno=42 next
 ```
 
 Accessible as `{{ .var.env }}` and `{{ .var.buildno }}`.
+
+Config-level defaults can be set under `semver.vars:` — CLI `--var` always wins.
+
+### OS environment variables (`.env.*`)
+
+All OS environment variables are available as `{{ .env.<NAME> }}` in `version_format`, `constraint`, and `vars:` values.
+
+```
+# .env.* — all OS environment variables. {{ .env.BUILD_NUMBER }}, etc.
+# Absent variables render as empty string. Use | default for fallbacks.
+```
+
+Example:
+
+```yaml
+semver:
+  vars:
+    stream: '{{ .env.STREAM | default "1" }}'
+  branches:
+    - pattern: "main"
+      version_format: "{{ .semver.Semver }}+{{ .env.CI_BUILD_NUMBER }}"
+```
 
 ---
 

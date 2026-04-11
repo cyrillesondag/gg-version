@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
@@ -186,7 +187,8 @@ func nextCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
-	results, err := strategy.AllCurrent(project, flags.Vars, cfg)
+	extra := resolveConfigVars(cfg.Semver.Vars, flags.Vars)
+	results, err := strategy.AllCurrent(project, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing next version: %w", err)
 	}
@@ -209,7 +211,8 @@ func lastCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
 
-	results, err := strategy.AllLast(project, flags.Vars, cfg)
+	extra := resolveConfigVars(cfg.Semver.Vars, flags.Vars)
+	results, err := strategy.AllLast(project, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing last version: %w", err)
 	}
@@ -243,7 +246,8 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	allResults, err := strategy.AllVars(project, flags.Vars, cfg)
+	extra := resolveConfigVars(cfg.Semver.Vars, flags.Vars)
+	allResults, err := strategy.AllVars(project, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing vars: %w", err)
 	}
@@ -541,7 +545,8 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 		fmt.Fprintln(os.Stderr, "warning: shallow clone detected — computed version may be underestimated")
 	}
 	strategy := semverstrategy.NewStrategy(cfg.Semver)
-	results, err := strategy.AllCurrent(p, flags.Vars, cfg)
+	extra := resolveConfigVars(cfg.Semver.Vars, flags.Vars)
+	results, err := strategy.AllCurrent(p, extra, cfg)
 	if err != nil {
 		return fmt.Errorf("computing versions: %w", err)
 	}
@@ -690,6 +695,51 @@ func parseVarFlags(rawVars []string) map[string]string {
 		}
 	}
 	return extra
+}
+
+// resolveConfigVars renders each config var value as a Go template with .env.*
+// available, then merges with cliVars (CLI wins). Render errors are logged to
+// stderr; the key gets an empty string value.
+func resolveConfigVars(cfgVars map[string]string, cliVars map[string]string) map[string]string {
+	env := map[string]interface{}{}
+	for _, kv := range os.Environ() {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) == 2 {
+			env[parts[0]] = parts[1]
+		}
+	}
+
+	defaultFn := template.FuncMap{
+		"default": func(def, val interface{}) interface{} {
+			s, _ := val.(string)
+			if s == "" {
+				return def
+			}
+			return val
+		},
+	}
+
+	merged := make(map[string]string, len(cfgVars)+len(cliVars))
+	data := map[string]interface{}{"env": env}
+	for k, v := range cfgVars {
+		t, err := template.New("").Funcs(defaultFn).Parse(v)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: parsing config var %q template: %v\n", k, err)
+			merged[k] = ""
+			continue
+		}
+		var buf strings.Builder
+		if err := t.Execute(&buf, data); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: rendering config var %q: %v\n", k, err)
+			merged[k] = ""
+			continue
+		}
+		merged[k] = buf.String()
+	}
+	for k, v := range cliVars {
+		merged[k] = v // CLI always wins
+	}
+	return merged
 }
 
 // printVars prints vars to stdout in the requested format (plain or json).

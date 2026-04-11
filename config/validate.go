@@ -29,12 +29,12 @@ func Validate(cfg Config) error {
 			add(fmt.Sprintf("semver.branches[%d].pattern %q: %v", i, b.Pattern, err))
 		}
 		if b.VersionFormat != "" {
-			if _, err := template.New("").Parse(b.VersionFormat); err != nil {
+			if err := validateTemplate(b.VersionFormat); err != nil {
 				add(fmt.Sprintf("semver.branches[%d].version_format %q: %v", i, b.VersionFormat, err))
 			}
 		}
 		if b.Constraint != "" {
-			if _, err := template.New("").Parse(b.Constraint); err != nil {
+			if err := validateTemplate(b.Constraint); err != nil {
 				add(fmt.Sprintf("semver.branches[%d].constraint %q: %v", i, b.Constraint, err))
 			}
 		}
@@ -57,6 +57,13 @@ func Validate(cfg Config) error {
 			if _, err := regexp.Compile(p); err != nil {
 				add(fmt.Sprintf("semver.conventional_commits.%s[%d] %q: %v", level, j, p, err))
 			}
+		}
+	}
+
+	// semver.vars
+	for key, val := range cfg.Semver.Vars {
+		if err := validateTemplate(val); err != nil {
+			add(fmt.Sprintf("semver.vars[%s] %q: %v", key, val, err))
 		}
 	}
 
@@ -83,6 +90,17 @@ func Validate(cfg Config) error {
 		return nil
 	}
 	return fmt.Errorf("config validation failed:\n%s", strings.Join(violations, "\n"))
+}
+
+// validateTemplate parses a Go template string and returns an error for
+// structural syntax problems. Errors about undefined functions are ignored,
+// because additional functions may be registered at render time.
+func validateTemplate(tmpl string) error {
+	_, err := template.New("").Parse(tmpl)
+	if err != nil && !strings.Contains(err.Error(), "not defined") {
+		return err
+	}
+	return nil
 }
 
 // isValidGitRefComponent reports whether s is a valid git ref name component

@@ -166,6 +166,20 @@ func TestValidate_invalidBranchConstraint(t *testing.T) {
 	}
 }
 
+func TestValidate_invalidVar(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Semver.Vars = map[string]string{
+		"stream": "{{ .Unclosed",
+	}
+	err := config.Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid var template, got nil")
+	}
+	if !strings.Contains(err.Error(), "semver.vars[stream]") {
+		t.Errorf("expected mention of semver.vars[stream], got: %v", err)
+	}
+}
+
 func TestValidate_multipleViolations(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Semver.Initial = "bad"

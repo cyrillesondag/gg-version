@@ -227,6 +227,38 @@ semver:
 	}
 }
 
+func TestLoadSemverVars(t *testing.T) {
+	content := `
+semver:
+  tag_prefix: "v"
+  vars:
+    stream: "{{ .env.STREAM | default \"1\" }}"
+    build: "{{ .env.CI_BUILD_NUMBER }}"
+    env: "prod"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".gg-version.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Semver.Vars) != 3 {
+		t.Fatalf("expected 3 vars, got %d: %v", len(cfg.Semver.Vars), cfg.Semver.Vars)
+	}
+	if cfg.Semver.Vars["stream"] != `{{ .env.STREAM | default "1" }}` {
+		t.Errorf("stream: got %q", cfg.Semver.Vars["stream"])
+	}
+	if cfg.Semver.Vars["build"] != "{{ .env.CI_BUILD_NUMBER }}" {
+		t.Errorf("build: got %q", cfg.Semver.Vars["build"])
+	}
+	if cfg.Semver.Vars["env"] != "prod" {
+		t.Errorf("env: got %q", cfg.Semver.Vars["env"])
+	}
+}
+
 func TestDefaultConfig_noComponents(t *testing.T) {
 	cfg := config.DefaultConfig()
 	if len(cfg.Components) != 0 {
