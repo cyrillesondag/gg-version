@@ -346,6 +346,63 @@ func TestConstraintViaVar(t *testing.T) {
 	}
 }
 
+func TestEnvVarInVersionFormat(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.0.0")
+	createCommit(t, repo)
+
+	cfg := config.SemverConfig{
+		TagPrefix: "",
+		Initial:   "0.1.0",
+		Branches: []config.BranchConfig{
+			{
+				Pattern:       `^refs/heads/main$`,
+				VersionFormat: `{{ .semver.Semver }}-{{ .env.BUILD_NUM }}`,
+			},
+		},
+		ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+	}
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(cfg)
+
+	t.Setenv("BUILD_NUM", "42")
+	got, err := s.Current(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "1.0.1-42" {
+		t.Fatalf("expected 1.0.1-42, got %s", got)
+	}
+}
+
+func TestEnvVarDefaultFunction(t *testing.T) {
+	repo := newRepo(t)
+	createTag(t, repo, "1.0.0")
+	createCommit(t, repo)
+
+	cfg := config.SemverConfig{
+		TagPrefix: "",
+		Initial:   "0.1.0",
+		Branches: []config.BranchConfig{
+			{
+				Pattern:       `^refs/heads/main$`,
+				VersionFormat: `{{ .semver.Semver }}-{{ .env.UNSET_GOVER_VAR | default "none" }}`,
+			},
+		},
+		ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+	}
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(cfg)
+
+	got, err := s.Current(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "1.0.1-none" {
+		t.Fatalf("expected 1.0.1-none, got %s", got)
+	}
+}
+
 func TestParseWildcardConstraint(t *testing.T) {
 	cases := []struct {
 		input   string

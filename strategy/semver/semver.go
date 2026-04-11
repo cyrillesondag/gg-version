@@ -277,6 +277,7 @@ func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefi
 	}
 
 	return map[string]interface{}{
+		"env": envMap(),
 		"semver": map[string]interface{}{
 			"Semver":                    semverStr,
 			"Major":                     nextMajor,
@@ -383,6 +384,19 @@ func (s semverStrategy) matchBranch(branchName string) (config.BranchConfig, map
 	}, map[string]string{}
 }
 
+// envMap returns all OS environment variables as map[string]interface{}.
+// Absent keys render as empty string in templates (Go template missingkey=zero default).
+func envMap() map[string]interface{} {
+	m := map[string]interface{}{}
+	for _, kv := range os.Environ() {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) == 2 {
+			m[parts[0]] = parts[1]
+		}
+	}
+	return m
+}
+
 // ParseWildcardConstraint parses a wildcard semver string like "1.x.x" into a
 // constraint map. Each component must be a non-negative integer or "x".
 // Returns empty map for "" or "x.x.x". Returns error for invalid input.
@@ -424,6 +438,7 @@ func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string
 		varVars[k] = v
 	}
 	vars := map[string]interface{}{
+		"env":   envMap(),
 		"regex": regexVars,
 		"var":   varVars,
 	}
@@ -442,8 +457,18 @@ func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string
 
 // renderTemplate executes a Go text/template with the given variables.
 // vars is a map[string]interface{} so named captures can be added dynamically.
+// The "default" pipe function is available: {{ .env.VAR | default "fallback" }}.
 func renderTemplate(tmpl string, vars map[string]interface{}) (string, error) {
-	t, err := template.New("version").Parse(tmpl)
+	funcMap := template.FuncMap{
+		"default": func(def, val interface{}) interface{} {
+			s, _ := val.(string)
+			if s == "" {
+				return def
+			}
+			return val
+		},
+	}
+	t, err := template.New("version").Funcs(funcMap).Parse(tmpl)
 	if err != nil {
 		return "", fmt.Errorf("parsing version template %q: %w", tmpl, err)
 	}
