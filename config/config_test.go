@@ -20,8 +20,26 @@ func TestDefaultConfigWhenFileMissing(t *testing.T) {
 	if cfg.Semver.TagPrefix != "" {
 		t.Fatalf("expected empty tag_prefix, got %s", cfg.Semver.TagPrefix)
 	}
-	if len(cfg.Semver.Branches) == 0 {
-		t.Fatal("expected at least one default branch pattern")
+	if len(cfg.Semver.Branches) != 3 {
+		t.Fatalf("expected 3 default branch patterns (main, master, .*), got %d", len(cfg.Semver.Branches))
+	}
+	if cfg.Semver.Branches[0].Pattern != "main" {
+		t.Errorf("expected branches[0].Pattern=main, got %q", cfg.Semver.Branches[0].Pattern)
+	}
+	if cfg.Semver.Branches[0].VersionFormat != "" {
+		t.Errorf("expected branches[0].VersionFormat empty (release), got %q", cfg.Semver.Branches[0].VersionFormat)
+	}
+	if cfg.Semver.Branches[1].Pattern != "master" {
+		t.Errorf("expected branches[1].Pattern=master, got %q", cfg.Semver.Branches[1].Pattern)
+	}
+	if cfg.Semver.Branches[1].VersionFormat != "" {
+		t.Errorf("expected branches[1].VersionFormat empty (release), got %q", cfg.Semver.Branches[1].VersionFormat)
+	}
+	if cfg.Semver.Branches[2].Pattern != ".*" {
+		t.Errorf("expected branches[2].Pattern=.*, got %q", cfg.Semver.Branches[2].Pattern)
+	}
+	if cfg.Semver.Branches[2].VersionFormat == "" {
+		t.Error("expected branches[2].VersionFormat to be set (pre-release template)")
 	}
 }
 
@@ -32,10 +50,8 @@ semver:
   initial: "1.0.0"
   branches:
     - pattern: "^refs/heads/main$"
-      release: true
     - pattern: ".*"
-      release: false
-      format: "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}"
+      version_format: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".gg-version.yaml")
@@ -56,14 +72,11 @@ semver:
 	if len(cfg.Semver.Branches) != 2 {
 		t.Fatalf("expected 2 branch configs, got %d", len(cfg.Semver.Branches))
 	}
-	if !cfg.Semver.Branches[0].Release {
-		t.Fatal("expected first branch to be release")
+	if cfg.Semver.Branches[0].VersionFormat != "" {
+		t.Errorf("expected first branch VersionFormat empty (release), got %q", cfg.Semver.Branches[0].VersionFormat)
 	}
-	if cfg.Semver.Branches[1].Release {
-		t.Fatal("expected second branch to be pre-release")
-	}
-	if cfg.Semver.Branches[1].Format != "{{ .semver.LastTag }}-dev.{{ .semver.CommitCount }}" {
-		t.Fatalf("unexpected format: %s", cfg.Semver.Branches[1].Format)
+	if cfg.Semver.Branches[1].VersionFormat != "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}" {
+		t.Fatalf("unexpected VersionFormat: %s", cfg.Semver.Branches[1].VersionFormat)
 	}
 }
 

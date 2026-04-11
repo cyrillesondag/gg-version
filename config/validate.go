@@ -28,9 +28,9 @@ func Validate(cfg Config) error {
 		if _, err := regexp.Compile(b.Pattern); err != nil {
 			add(fmt.Sprintf("semver.branches[%d].pattern %q: %v", i, b.Pattern, err))
 		}
-		if !b.Release && b.Format != "" {
-			if _, err := template.New("").Parse(b.Format); err != nil {
-				add(fmt.Sprintf("semver.branches[%d].format %q: %v", i, b.Format, err))
+		if b.VersionFormat != "" {
+			if _, err := template.New("").Parse(b.VersionFormat); err != nil {
+				add(fmt.Sprintf("semver.branches[%d].version_format %q: %v", i, b.VersionFormat, err))
 			}
 		}
 	}
