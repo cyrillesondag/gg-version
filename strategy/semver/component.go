@@ -133,7 +133,7 @@ func (s semverStrategy) varsCoreFromHistory(
 	}
 
 	branchCfg, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	constraints := resolveConstraint(branchCfg, captures, extra)
 	f := NewSemverFormat(tagPrefix, constraints)
 
 	lastTag, tagIdx := hist.findLastTag(f)
@@ -328,8 +328,8 @@ func (s semverStrategy) AllLast(p GitProject, cfg config.Config) ([]ComponentRes
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
 	}
-	_, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	branchCfg, captures := s.matchBranch(branchName)
+	constraints := resolveConstraint(branchCfg, captures, nil)
 
 	rootF := NewSemverFormat(s.cfg.TagPrefix, constraints)
 	rootTag, _ := hist.findLastTag(rootF)
@@ -419,8 +419,8 @@ func (s semverStrategy) AllLint(p GitProject, cfg config.Config) ([]ComponentLin
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
 	}
-	_, captures := s.matchBranch(branchName)
-	constraints := versionConstraints(captures)
+	branchCfg, captures := s.matchBranch(branchName)
+	constraints := resolveConstraint(branchCfg, captures, nil)
 
 	rootFilter := FilterConfig{
 		ExcludePaths:  append(append([]string{}, s.cfg.IgnorePaths...), allComponentPaths(cfg.Components)...),

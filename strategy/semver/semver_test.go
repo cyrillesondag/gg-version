@@ -294,7 +294,10 @@ func TestLastRespectsMajorConstraint(t *testing.T) {
 		TagPrefix: "",
 		Initial:   "0.1.0",
 		Branches: []config.BranchConfig{
-			{Pattern: `^refs/heads/release/(?P<major>\d+)\.x$`}, // no VersionFormat = release branch
+			{
+				Pattern:    `^refs/heads/release/(?P<major>\d+)\.x$`,
+				Constraint: "{{ .regex.major }}.x.x",
+			},
 			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
 		},
 	}
@@ -307,6 +310,78 @@ func TestLastRespectsMajorConstraint(t *testing.T) {
 	}
 	if got != "1.0.0" {
 		t.Fatalf("expected 1.0.0 (major=1 constraint ignores 2.0.0), got %s", got)
+	}
+}
+
+func TestConstraintViaVar(t *testing.T) {
+	// Repo: initial commit → tag 2.0.0 → commit → tag 1.0.0 (HEAD)
+	// With stream=1, constraint restricts to major=1, so LastTag=1.0.0.
+	// HEAD is exactly on 1.0.0, so Current returns "1.0.0".
+	repo := newRepo(t)
+	createTag(t, repo, "2.0.0")
+	createCommit(t, repo)
+	createTag(t, repo, "1.0.0")
+
+	cfg := config.SemverConfig{
+		TagPrefix: "",
+		Initial:   "0.1.0",
+		Branches: []config.BranchConfig{
+			{
+				Pattern:    `^refs/heads/main$`,
+				Constraint: "{{ .var.stream }}.x.x",
+			},
+			{Pattern: ".*", VersionFormat: "{{ .semver.Semver }}-dev.{{ .git.CommitCount }}"},
+		},
+		ConventionalCommits: config.DefaultConfig().Semver.ConventionalCommits,
+	}
+	p := newFakeProject(t, repo, "refs/heads/main")
+	s := semverstrategy.NewStrategy(cfg)
+
+	got, err := s.Current(p, map[string]string{"stream": "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "1.0.0" {
+		t.Fatalf("expected 1.0.0 (stream=1 constraint ignores 2.0.0), got %s", got)
+	}
+}
+
+func TestParseWildcardConstraint(t *testing.T) {
+	cases := []struct {
+		input   string
+		want    map[string]string
+		wantErr bool
+	}{
+		{"", map[string]string{}, false},
+		{"x.x.x", map[string]string{}, false},
+		{"1.x.x", map[string]string{"major": "1"}, false},
+		{"1.2.x", map[string]string{"major": "1", "minor": "2"}, false},
+		{"1.2.3", map[string]string{"major": "1", "minor": "2", "patch": "3"}, false},
+		{"bad", nil, true},
+		{"a.x.x", nil, true},
+		{"1.x", nil, true},
+	}
+	for _, tc := range cases {
+		got, err := semverstrategy.ParseWildcardConstraint(tc.input)
+		if tc.wantErr {
+			if err == nil {
+				t.Errorf("ParseWildcardConstraint(%q): expected error, got nil", tc.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("ParseWildcardConstraint(%q): unexpected error: %v", tc.input, err)
+			continue
+		}
+		if len(got) != len(tc.want) {
+			t.Errorf("ParseWildcardConstraint(%q): got %v, want %v", tc.input, got, tc.want)
+			continue
+		}
+		for k, v := range tc.want {
+			if got[k] != v {
+				t.Errorf("ParseWildcardConstraint(%q): key %q: got %q, want %q", tc.input, k, got[k], v)
+			}
+		}
 	}
 }
 
