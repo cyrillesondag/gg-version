@@ -1,5 +1,8 @@
 # gg-version
 
+[![CI](https://github.com/cyrillesondag/gg-version/actions/workflows/ci.yml/badge.svg)](https://github.com/cyrillesondag/gg-version/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cyrillesondag/gg-version)](https://goreportcard.com/report/github.com/cyrillesondag/gg-version)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/cyrillesondag/gg-version/badge)](https://securityscorecards.dev/viewer/?uri=github.com/cyrillesondag/gg-version)
 
 > Automatically computes your project version from Git history and Conventional Commits — without ever writing to the repository.
