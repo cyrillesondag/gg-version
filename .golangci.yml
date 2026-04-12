@@ -20,8 +20,6 @@ linters:
     gosec:
       excludes:
         - G304   # file path from variable — intentional in CLI tools
-
-issues:
   exclusions:
     rules:
       - path: _test\.go
