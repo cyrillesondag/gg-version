@@ -1,12 +1,13 @@
 package git_test
 
 import (
-	gitpkg "github.com/cyrillesondag/gg-version/git"
-	"github.com/cyrillesondag/gg-version/format"
-	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cyrillesondag/gg-version/format"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
+	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -49,13 +50,13 @@ func projectAtCommit(t *testing.T, repo *git.Repository, hash plumbing.Hash) *gi
 	return p
 }
 
-func createAnnotatedTag(t *testing.T, r *git.Repository, tag string) plumbing.Hash {
+func createAnnotatedTag(t *testing.T, r *git.Repository, tag string) {
 	t.Helper()
 	head, err := r.Head()
 	if err != nil {
 		t.Fatal(err)
 	}
-	tagRef, err := r.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
+	_, err = r.CreateTag(tag, head.Hash(), &git.CreateTagOptions{
 		Message: tag,
 		Tagger: &object.Signature{
 			Name:  "tagger",
@@ -66,7 +67,6 @@ func createAnnotatedTag(t *testing.T, r *git.Repository, tag string) plumbing.Ha
 	if err != nil {
 		t.Fatal(err)
 	}
-	return tagRef.Hash()
 }
 
 func createCommit(t *testing.T, r *git.Repository) plumbing.Hash {
@@ -104,26 +104,24 @@ func createCommit(t *testing.T, r *git.Repository) plumbing.Hash {
 	return h
 }
 
-func createTag(t *testing.T, r *git.Repository, tag string) plumbing.Hash {
+func createTag(t *testing.T, r *git.Repository, tag string) {
 	t.Helper()
 	head, err := r.Head()
 	if err != nil {
 		t.Fatal(err)
 	}
-	tagRef, err := r.CreateTag(tag, head.Hash(), nil)
+	_, err = r.CreateTag(tag, head.Hash(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return tagRef.Hash()
 }
 
-func createTagAt(t *testing.T, r *git.Repository, hash plumbing.Hash, tag string) plumbing.Hash {
+func createTagAt(t *testing.T, r *git.Repository, hash plumbing.Hash, tag string) {
 	t.Helper()
-	tagRef, err := r.CreateTag(tag, hash, nil)
+	_, err := r.CreateTag(tag, hash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return tagRef.Hash()
 }
 
 func semverFmt(prefix string) format.VersionFormat {

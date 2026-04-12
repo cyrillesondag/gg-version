@@ -270,18 +270,18 @@ func TestFilterCommits_ignoreCommitShortSHA(t *testing.T) {
 func TestFilterCommits_rootExcludesComponents(t *testing.T) {
 	repo := newRepo(t)
 	// Commit qui touche UNIQUEMENT api/ → doit être exclu de @root
-	cOnlyApi := makeCommit(t, repo, "feat: api only")
+	cOnlyAPI := makeCommit(t, repo, "feat: api only")
 	// Commit qui touche api/ ET go.mod → doit être inclus dans @root
-	cApiAndRoot := makeCommit(t, repo, "feat: api + root")
+	cAPIAndRoot := makeCommit(t, repo, "feat: api + root")
 	fm := fakeFiles(map[string][]string{
-		cOnlyApi.Hash.String():    {"api/handler.go"},
-		cApiAndRoot.Hash.String(): {"api/handler.go", "go.mod"},
+		cOnlyAPI.Hash.String():    {"api/handler.go"},
+		cAPIAndRoot.Hash.String(): {"api/handler.go", "go.mod"},
 	})
 	// @root exclut api/**
 	cfg := semverstrategy.FilterConfig{ExcludePaths: []string{"api/**"}}
-	result := semverstrategy.FilterCommits([]*object.Commit{cOnlyApi, cApiAndRoot}, fm, cfg)
-	if len(result) != 1 || result[0].Hash != cApiAndRoot.Hash {
-		t.Errorf("expected only cApiAndRoot in @root, got %d commits", len(result))
+	result := semverstrategy.FilterCommits([]*object.Commit{cOnlyAPI, cAPIAndRoot}, fm, cfg)
+	if len(result) != 1 || result[0].Hash != cAPIAndRoot.Hash {
+		t.Errorf("expected only cAPIAndRoot in @root, got %d commits", len(result))
 	}
 }
 
@@ -338,7 +338,11 @@ func TestLintCommits_violations(t *testing.T) {
 		t.Errorf("expected first violation subject %q, got %q", "WIP fix auth", violations[0].Subject)
 	}
 	if violations[1].Subject != "Merge pull request #42 from foo/bar" {
-		t.Errorf("expected second violation subject %q, got %q", "Merge pull request #42 from foo/bar", violations[1].Subject)
+		t.Errorf(
+			"expected second violation subject %q, got %q",
+			"Merge pull request #42 from foo/bar",
+			violations[1].Subject,
+		)
 	}
 	// Hash must be a 7-char hex string
 	if len(violations[0].Hash) != 7 {

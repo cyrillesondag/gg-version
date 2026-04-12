@@ -20,6 +20,8 @@ import (
 
 // SemverFormat validates semver tags, optionally requiring a prefix and
 // enforcing version component constraints (major, minor, patch).
+//
+//nolint:revive // SemverFormat is an established public API; renaming would break callers
 type SemverFormat struct {
 	Prefix      string
 	Constraints map[string]string // e.g. {"major": "1", "minor": "2"}
@@ -45,8 +47,8 @@ func (s SemverFormat) IsValid(version string) bool {
 			return false
 		}
 	}
-	if min, ok := s.Constraints["minor"]; ok {
-		if strconv.FormatInt(v.Minor, 10) != min {
+	if minorVal, ok := s.Constraints["minor"]; ok {
+		if strconv.FormatInt(v.Minor, 10) != minorVal {
 			return false
 		}
 	}
@@ -110,7 +112,7 @@ type ComponentLintResult struct {
 type Strategy interface {
 	Current(p GitProject, extra map[string]string) (string, error)
 	Last(p GitProject, extra map[string]string) (string, error)
-	Vars(p GitProject, extra map[string]string) (map[string]interface{}, error)
+	Vars(p GitProject, extra map[string]string) (map[string]any, error)
 	AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
 	AllLast(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error)
 	AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error)
@@ -154,12 +156,12 @@ func (s semverStrategy) Last(p GitProject, extra map[string]string) (string, err
 
 // Vars returns all template variables as a nested map, grouped by namespace:
 //   - "semver": Semver, Major, Minor, Patch, PreRelease (CC-calculated),
-//               LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
-//               IsBreakingChange, IsPreRelease, HasNonConventionalCommits
+//     LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
+//     IsBreakingChange, IsPreRelease, HasNonConventionalCommits
 //   - "git":    Branch, AuthorDate, CommitterDate, LastTag, Hash, ShortHash, CommitCount, IsShallow, Truncated
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
-func (s semverStrategy) Vars(p GitProject, extra map[string]string) (map[string]interface{}, error) {
+func (s semverStrategy) Vars(p GitProject, extra map[string]string) (map[string]any, error) {
 	return s.varsCore(p, extra, s.cfg.TagPrefix, FilterConfig{
 		ExcludePaths:  s.cfg.IgnorePaths,
 		IgnoreCommits: s.cfg.IgnoreCommits,
@@ -168,7 +170,12 @@ func (s semverStrategy) Vars(p GitProject, extra map[string]string) (map[string]
 
 // varsCore is the parameterised implementation of Vars, allowing callers to
 // override the tag prefix and filter configuration (used by component methods).
-func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error) {
+func (s semverStrategy) varsCore(
+	p GitProject,
+	extra map[string]string,
+	tagPrefix string,
+	filterCfg FilterConfig,
+) (map[string]any, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
@@ -267,18 +274,18 @@ func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefi
 		rawLastTag = ""
 	}
 
-	regexVars := map[string]interface{}{}
+	regexVars := map[string]any{}
 	for k, v := range captures {
 		regexVars[k] = v
 	}
-	varVars := map[string]interface{}{}
+	varVars := map[string]any{}
 	for k, v := range extra {
 		varVars[k] = v
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"env": envMap(),
-		"semver": map[string]interface{}{
+		"semver": map[string]any{
 			"Semver":                    semverStr,
 			"Major":                     nextMajor,
 			"Minor":                     nextMinor,
@@ -293,7 +300,7 @@ func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefi
 			"IsPreRelease":              branchCfg.VersionFormat != "",
 			"HasNonConventionalCommits": hasNonCC,
 		},
-		"git": map[string]interface{}{
+		"git": map[string]any{
 			"Branch":        shortBranch,
 			"AuthorDate":    authorDate.UTC().Format("2006-01-02"),
 			"CommitterDate": committerDate.UTC().Format("2006-01-02"),
@@ -384,10 +391,10 @@ func (s semverStrategy) matchBranch(branchName string) (config.BranchConfig, map
 	}, map[string]string{}
 }
 
-// envMap returns all OS environment variables as map[string]interface{}.
+// envMap returns all OS environment variables as map[string]any.
 // Absent keys render as empty string in templates (Go template missingkey=zero default).
-func envMap() map[string]interface{} {
-	m := map[string]interface{}{}
+func envMap() map[string]any {
+	m := map[string]any{}
 	for _, kv := range os.Environ() {
 		parts := strings.SplitN(kv, "=", 2)
 		if len(parts) == 2 {
@@ -425,19 +432,23 @@ func ParseWildcardConstraint(s string) (map[string]string, error) {
 // resolveConstraint renders the branch Constraint template and parses the wildcard result.
 // Only .regex.* and .var.* are available (no .semver.* or .git.*).
 // Returns empty constraints (no filter) if Constraint is empty or on render/parse error.
-func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string, extra map[string]string) map[string]string {
+func resolveConstraint(
+	branchCfg config.BranchConfig,
+	captures map[string]string,
+	extra map[string]string,
+) map[string]string {
 	if branchCfg.Constraint == "" {
 		return map[string]string{}
 	}
-	regexVars := map[string]interface{}{}
+	regexVars := map[string]any{}
 	for k, v := range captures {
 		regexVars[k] = v
 	}
-	varVars := map[string]interface{}{}
+	varVars := map[string]any{}
 	for k, v := range extra {
 		varVars[k] = v
 	}
-	vars := map[string]interface{}{
+	vars := map[string]any{
 		"env":   envMap(),
 		"regex": regexVars,
 		"var":   varVars,
@@ -449,18 +460,24 @@ func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string
 	}
 	constraints, err := ParseWildcardConstraint(rendered)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: parsing branch constraint %q (rendered: %q): %v\n", branchCfg.Constraint, rendered, err)
+		fmt.Fprintf(
+			os.Stderr,
+			"warning: parsing branch constraint %q (rendered: %q): %v\n",
+			branchCfg.Constraint,
+			rendered,
+			err,
+		)
 		return map[string]string{}
 	}
 	return constraints
 }
 
 // renderTemplate executes a Go text/template with the given variables.
-// vars is a map[string]interface{} so named captures can be added dynamically.
+// vars is a map[string]any so named captures can be added dynamically.
 // The "default" pipe function is available: {{ .env.VAR | default "fallback" }}.
-func renderTemplate(tmpl string, vars map[string]interface{}) (string, error) {
+func renderTemplate(tmpl string, vars map[string]any) (string, error) {
 	funcMap := template.FuncMap{
-		"default": func(def, val interface{}) interface{} {
+		"default": func(def, val any) any {
 			s, _ := val.(string)
 			if s == "" {
 				return def

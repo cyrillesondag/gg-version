@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -24,7 +25,7 @@ type ComponentResult struct {
 // ComponentVarsResult holds vars for one entity.
 type ComponentVarsResult struct {
 	Name string
-	Vars map[string]interface{}
+	Vars map[string]any
 }
 
 // ResolveTagPrefix returns the full tag prefix for a component.
@@ -126,7 +127,7 @@ func (s semverStrategy) varsCoreFromHistory(
 	hist *sharedHistory,
 	tagPrefix string,
 	filterCfg FilterConfig,
-) (map[string]interface{}, error) {
+) (map[string]any, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
@@ -207,17 +208,17 @@ func (s semverStrategy) varsCoreFromHistory(
 		rawLastTag = ""
 	}
 
-	regexVars := map[string]interface{}{}
+	regexVars := map[string]any{}
 	for k, v := range captures {
 		regexVars[k] = v
 	}
-	varVars := map[string]interface{}{}
+	varVars := map[string]any{}
 	for k, v := range extra {
 		varVars[k] = v
 	}
 
-	return map[string]interface{}{
-		"semver": map[string]interface{}{
+	return map[string]any{
+		"semver": map[string]any{
 			"Semver":                    semverStr,
 			"Major":                     nextMajor,
 			"Minor":                     nextMinor,
@@ -232,7 +233,7 @@ func (s semverStrategy) varsCoreFromHistory(
 			"IsPreRelease":              branchCfg.VersionFormat != "",
 			"HasNonConventionalCommits": hasNonCC,
 		},
-		"git": map[string]interface{}{
+		"git": map[string]any{
 			"Branch":        shortBranch,
 			"AuthorDate":    authorDate.UTC().Format("2006-01-02"),
 			"CommitterDate": committerDate.UTC().Format("2006-01-02"),
@@ -251,7 +252,11 @@ func (s semverStrategy) varsCoreFromHistory(
 
 // AllCurrent returns current versions for @root and all components.
 // When no components are defined, returns a single result with Name="" (backward compat).
-func (s semverStrategy) AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error) {
+func (s semverStrategy) AllCurrent(
+	p GitProject,
+	extra map[string]string,
+	cfg config.Config,
+) ([]ComponentResult, error) {
 	if len(cfg.Components) == 0 {
 		filter := FilterConfig{
 			ExcludePaths:  s.cfg.IgnorePaths,
@@ -353,7 +358,11 @@ func (s semverStrategy) AllLast(p GitProject, extra map[string]string, cfg confi
 }
 
 // AllVars returns vars for @root and all components.
-func (s semverStrategy) AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error) {
+func (s semverStrategy) AllVars(
+	p GitProject,
+	extra map[string]string,
+	cfg config.Config,
+) ([]ComponentVarsResult, error) {
 	if len(cfg.Components) == 0 {
 		vars, err := s.Vars(p, extra)
 		if err != nil {
@@ -427,10 +436,7 @@ func (s semverStrategy) AllLint(p GitProject, cfg config.Config) ([]ComponentLin
 		ExcludePaths:  append(append([]string{}, s.cfg.IgnorePaths...), allComponentPaths(cfg.Components)...),
 		IgnoreCommits: s.cfg.IgnoreCommits,
 	}
-	rootViolations, rootTruncated, err := s.lintFromHistory(p, hist, s.cfg.TagPrefix, constraints, rootFilter)
-	if err != nil {
-		return nil, err
-	}
+	rootViolations, rootTruncated := s.lintFromHistory(p, hist, s.cfg.TagPrefix, constraints, rootFilter)
 	results := []ComponentLintResult{{Name: "@root", Violations: rootViolations, Truncated: rootTruncated}}
 
 	for _, name := range sortedComponentNames(cfg.Components) {
@@ -441,17 +447,18 @@ func (s semverStrategy) AllLint(p GitProject, cfg config.Config) ([]ComponentLin
 			ExcludePaths:  s.cfg.IgnorePaths,
 			IgnoreCommits: s.cfg.IgnoreCommits,
 		}
-		violations, truncated, err := s.lintFromHistory(p, hist, tagPrefix, constraints, compFilter)
-		if err != nil {
-			return nil, err
-		}
+		violations, truncated := s.lintFromHistory(p, hist, tagPrefix, constraints, compFilter)
 		results = append(results, ComponentLintResult{Name: name, Violations: violations, Truncated: truncated})
 	}
 	return results, nil
 }
 
 // lintWithPrefix is the non-monorepo variant: uses p.LastTag + p.CommitSinceTag.
-func (s semverStrategy) lintWithPrefix(p GitProject, tagPrefix string, filterCfg FilterConfig) ([]LintResult, bool, error) {
+func (s semverStrategy) lintWithPrefix(
+	p GitProject,
+	tagPrefix string,
+	filterCfg FilterConfig,
+) ([]LintResult, bool, error) {
 	f := NewSemverFormat(tagPrefix, nil)
 	lastTag, err := p.LastTag(f)
 	if err != nil {
@@ -487,30 +494,34 @@ func (s semverStrategy) lintFromHistory(
 	tagPrefix string,
 	constraints map[string]string,
 	filterCfg FilterConfig,
-) ([]LintResult, bool, error) {
+) ([]LintResult, bool) {
 	f := NewSemverFormat(tagPrefix, constraints)
 	lastTag, tagIdx := hist.findLastTag(f)
 	if lastTag == "0.0.0" {
-		return nil, false, nil
+		return nil, false
 	}
 	rawCommits, truncated := hist.commitsSince(tagIdx)
 	commits := FilterCommits(rawCommits, p.CommitFiles, filterCfg)
 	violations := LintCommits(commits, s.cfg.ConventionalCommits)
-	return violations, truncated, nil
+	return violations, truncated
 }
 
 // currentFromVars derives the current version string from pre-computed vars.
 // Returns (version, tagged, error) where tagged=true means HEAD is exactly on that tag.
-func (s semverStrategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, bool, error) {
+func (s semverStrategy) currentFromVars(
+	p GitProject,
+	vars map[string]any,
+	tagPrefix string,
+) (string, bool, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", false, err
 	}
 	branchCfg, _ := s.matchBranch(branchName)
 
-	gitMap, ok := vars["git"].(map[string]interface{})
+	gitMap, ok := vars["git"].(map[string]any)
 	if !ok {
-		return "", false, fmt.Errorf("internal error: git namespace missing")
+		return "", false, errors.New("internal error: git namespace missing")
 	}
 	rawLastTag, _ := gitMap["LastTag"].(string)
 	if rawLastTag != "" {

@@ -2,9 +2,10 @@ package git
 
 import (
 	"fmt"
-	"github.com/cyrillesondag/gg-version/format"
 	"sort"
 	"time"
+
+	"github.com/cyrillesondag/gg-version/format"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -24,51 +25,6 @@ type Project struct {
 type CommitWithTags struct {
 	Commit *object.Commit
 	Tags   []string
-}
-
-// CommitHistory returns all commits reachable from HEAD in topological order
-// (HEAD first, ancestors later), each annotated with the tag names pointing to it.
-// Annotated tags are resolved to their target commit before matching.
-// Tags whose commits cannot be resolved (e.g. shallow clone) are silently skipped.
-func (p Project) CommitHistory() ([]CommitWithTags, error) {
-	// Pass 1: build map from commit hash → tag names
-	tagsByCommit := map[plumbing.Hash][]string{}
-	tagsRef, err := p.repo.Tags()
-	if err != nil {
-		return nil, fmt.Errorf("listing tags: %w", err)
-	}
-	defer tagsRef.Close()
-	if err := tagsRef.ForEach(func(ref *plumbing.Reference) error {
-		tagCommit, err := getCommitFromTag(p.repo, ref)
-		if err != nil {
-			return nil // skip unresolvable tags (e.g. beyond shallow boundary)
-		}
-		tagsByCommit[tagCommit.Hash] = append(tagsByCommit[tagCommit.Hash], ref.Name().Short())
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	// Sort tags for each commit to ensure deterministic output.
-	for hash, tags := range tagsByCommit {
-		sort.Strings(tags)
-		tagsByCommit[hash] = tags
-	}
-
-	// Pass 2: walk commits from HEAD, annotate with tags
-	iter := object.NewCommitPreorderIter(p.head, nil, nil)
-	defer iter.Close()
-	var result []CommitWithTags
-	if err := iter.ForEach(func(c *object.Commit) error {
-		result = append(result, CommitWithTags{
-			Commit: c,
-			Tags:   tagsByCommit[c.Hash],
-		})
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func NewProject(path, sha string) (*Project, error) {
@@ -113,6 +69,51 @@ func NewProjectFromRepo(repo *git.Repository, hash plumbing.Hash) (*Project, err
 	return &Project{repo, commit}, nil
 }
 
+// CommitHistory returns all commits reachable from HEAD in topological order
+// (HEAD first, ancestors later), each annotated with the tag names pointing to it.
+// Annotated tags are resolved to their target commit before matching.
+// Tags whose commits cannot be resolved (e.g. shallow clone) are silently skipped.
+func (p Project) CommitHistory() ([]CommitWithTags, error) {
+	// Pass 1: build map from commit hash → tag names
+	tagsByCommit := map[plumbing.Hash][]string{}
+	tagsRef, err := p.repo.Tags()
+	if err != nil {
+		return nil, fmt.Errorf("listing tags: %w", err)
+	}
+	defer tagsRef.Close()
+	if err := tagsRef.ForEach(func(ref *plumbing.Reference) error {
+		tagCommit, err := getCommitFromTag(p.repo, ref)
+		if err != nil {
+			return nil //nolint:nilerr // intentional: skip tags beyond shallow boundary
+		}
+		tagsByCommit[tagCommit.Hash] = append(tagsByCommit[tagCommit.Hash], ref.Name().Short())
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	// Sort tags for each commit to ensure deterministic output.
+	for hash, tags := range tagsByCommit {
+		sort.Strings(tags)
+		tagsByCommit[hash] = tags
+	}
+
+	// Pass 2: walk commits from HEAD, annotate with tags
+	iter := object.NewCommitPreorderIter(p.head, nil, nil)
+	defer iter.Close()
+	var result []CommitWithTags
+	if err := iter.ForEach(func(c *object.Commit) error {
+		result = append(result, CommitWithTags{
+			Commit: c,
+			Tags:   tagsByCommit[c.Hash],
+		})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // LastTag walks all reachable tags from HEAD, filters by f.IsValid, and returns
 // the topologically closest ancestor tag. Returns "0.0.0" when no valid tag is found.
 func (p Project) LastTag(f format.VersionFormat) (string, error) {
@@ -134,12 +135,12 @@ func (p Project) LastTag(f format.VersionFormat) (string, error) {
 
 		tagCommit, err := getCommitFromTag(repo, tagRef)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // intentional: skip tags that cannot be resolved
 		}
 
 		reachable, err := isAncestor(p.head, tagCommit)
 		if err != nil || !reachable {
-			return nil
+			return nil //nolint:nilerr // intentional: skip unreachable tags
 		}
 
 		if lastTag == nil {
@@ -182,7 +183,7 @@ func (p Project) LastTag(f format.VersionFormat) (string, error) {
 func (p Project) IsHeadTagged(tag string) (bool, error) {
 	ref, err := p.repo.Tag(tag)
 	if err != nil {
-		return false, nil // tag not found
+		return false, nil //nolint:nilerr // intentional: "tag not found" is not an error — HEAD is simply not tagged
 	}
 	tagCommit, err := getCommitFromTag(p.repo, ref)
 	if err != nil {
