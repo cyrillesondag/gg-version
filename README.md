@@ -1,7 +1,7 @@
 # gg-version
 
 [![CI](https://github.com/cyrillesondag/gg-version/actions/workflows/ci.yml/badge.svg)](https://github.com/cyrillesondag/gg-version/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/cyrillesondag/COVERAGE_GIST_ID/raw/gg-version-coverage.json)](https://github.com/cyrillesondag/gg-version/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/cyrillesondag/gg-version/graph/badge.svg)](https://codecov.io/gh/cyrillesondag/gg-version)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cyrillesondag/gg-version)](https://goreportcard.com/report/github.com/cyrillesondag/gg-version)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/cyrillesondag/gg-version/badge)](https://securityscorecards.dev/viewer/?uri=github.com/cyrillesondag/gg-version)
