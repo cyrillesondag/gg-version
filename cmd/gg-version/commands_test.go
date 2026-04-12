@@ -101,7 +101,7 @@ func testCmd(t *testing.T, args ...string) *cli.Command {
 			&cli.BoolFlag{Name: "push"},
 			&cli.StringFlag{Name: "message"},
 		},
-		Action: func(ctx context.Context, c *cli.Command) error { return nil },
+		Action: func(_ context.Context, _ *cli.Command) error { return nil },
 	}
 	if err := cmd.Run(context.Background(), append([]string{"cmd"}, args...)); err != nil {
 		t.Fatalf("testCmd.Run: %v", err)

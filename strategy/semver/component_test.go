@@ -211,8 +211,8 @@ func TestVarsCoreFromHistory(t *testing.T) {
 
 	// Both functions should produce identical values for the key fields.
 	for _, ns := range []string{"semver", "git"} {
-		wantNS := wantVars[ns].(map[string]interface{})
-		gotNS := gotVars[ns].(map[string]interface{})
+		wantNS := wantVars[ns].(map[string]any)
+		gotNS := gotVars[ns].(map[string]any)
 		for key, wv := range wantNS {
 			gv, ok := gotNS[key]
 			if !ok {
@@ -260,6 +260,7 @@ func internalCreateTag(t *testing.T, r *gogit.Repository, tag string) {
 // countingProject wraps a GitProject to count CommitHistory calls.
 type countingProject struct {
 	GitProject
+
 	commitHistoryCallCount int
 }
 

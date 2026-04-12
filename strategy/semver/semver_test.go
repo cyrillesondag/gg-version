@@ -217,8 +217,8 @@ func (fp *fakeProject) CommitDate() (time.Time, time.Time, error) {
 		time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), nil
 }
 
-func (fp *fakeProject) CreateTag(name, message string) error { return nil }
-func (fp *fakeProject) PushTags() error                      { return nil }
+func (fp *fakeProject) CreateTag(_, _ string) error { return nil }
+func (fp *fakeProject) PushTags() error             { return nil }
 
 func (fp *fakeProject) CommitHistory() ([]gitpkg.CommitWithTags, error) {
 	fp.commitHistoryCallCount++
@@ -524,7 +524,7 @@ func TestVars_semverNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	semverVars, ok := vars["semver"].(map[string]interface{})
+	semverVars, ok := vars["semver"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
@@ -546,7 +546,7 @@ func TestVars_gitNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitVars, ok := vars["git"].(map[string]interface{})
+	gitVars, ok := vars["git"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"git\"] to be a map")
 	}
@@ -596,7 +596,7 @@ func TestVars_regexNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	regexVars, ok := vars["regex"].(map[string]interface{})
+	regexVars, ok := vars["regex"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"regex\"] to be a map")
 	}
@@ -614,7 +614,7 @@ func TestVars_varNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	varVars, ok := vars["var"].(map[string]interface{})
+	varVars, ok := vars["var"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"var\"] to be a map")
 	}
@@ -637,7 +637,7 @@ func TestVars_semverMajorMinorPatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sv, ok := vars["semver"].(map[string]interface{})
+	sv, ok := vars["semver"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
@@ -680,7 +680,7 @@ func TestVars_semverPreRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sv, ok := vars["semver"].(map[string]interface{})
+	sv, ok := vars["semver"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
@@ -703,7 +703,7 @@ func TestVars_semverNoTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sv, ok := vars["semver"].(map[string]interface{})
+	sv, ok := vars["semver"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
@@ -742,7 +742,7 @@ func TestVars_semverParseFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sv, ok := vars["semver"].(map[string]interface{})
+	sv, ok := vars["semver"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"semver\"] to be a map")
 	}
@@ -769,7 +769,7 @@ func TestVars_gitDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitVars, ok := vars["git"].(map[string]interface{})
+	gitVars, ok := vars["git"].(map[string]any)
 	if !ok {
 		t.Fatal("expected vars[\"git\"] to be a map")
 	}
@@ -1183,7 +1183,7 @@ func TestVars_isPreRelease(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sv := vars["semver"].(map[string]interface{})
+		sv := vars["semver"].(map[string]any)
 		if sv["IsPreRelease"] != false {
 			t.Errorf("expected IsPreRelease=false on release branch (no VersionFormat), got %v", sv["IsPreRelease"])
 		}
@@ -1209,7 +1209,7 @@ func TestVars_isPreRelease(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sv := vars["semver"].(map[string]interface{})
+		sv := vars["semver"].(map[string]any)
 		if sv["IsPreRelease"] != true {
 			t.Errorf("expected IsPreRelease=true on pre-release branch (VersionFormat set), got %v", sv["IsPreRelease"])
 		}

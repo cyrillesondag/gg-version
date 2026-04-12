@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"sort"
 	"strings"
@@ -15,6 +17,12 @@ import (
 	"github.com/cyrillesondag/gg-version/config"
 	gitpkg "github.com/cyrillesondag/gg-version/git"
 	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
+)
+
+const (
+	formatJSON  = "json"
+	formatPlain = "plain"
+	rootName    = "@root"
 )
 
 // contextKey is the unexported key type for storing globalFlags in a context.
@@ -84,7 +92,7 @@ func Run(version string) error {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "format",
-						Value: "plain",
+						Value: formatPlain,
 						Usage: "output format: plain or json",
 					},
 				},
@@ -96,7 +104,7 @@ func Run(version string) error {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "format",
-						Value: "plain",
+						Value: formatPlain,
 						Usage: "output format: plain or json",
 					},
 				},
@@ -108,7 +116,7 @@ func Run(version string) error {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "format",
-						Value: "plain",
+						Value: formatPlain,
 						Usage: "output format: plain or json",
 					},
 				},
@@ -132,7 +140,7 @@ func Run(version string) error {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "format",
-						Value: "plain",
+						Value: formatPlain,
 						Usage: "output format: plain or json",
 					},
 				},
@@ -171,7 +179,7 @@ func Run(version string) error {
 func nextCmd(ctx context.Context, cmd *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	if flags.Component != "" && flags.Root {
-		return fmt.Errorf("--component and --root are mutually exclusive")
+		return errors.New("--component and --root are mutually exclusive")
 	}
 
 	cfg, err := config.Load(flags.Config)
@@ -198,7 +206,7 @@ func nextCmd(ctx context.Context, cmd *cli.Command) error {
 func lastCmd(ctx context.Context, cmd *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	if flags.Component != "" && flags.Root {
-		return fmt.Errorf("--component and --root are mutually exclusive")
+		return errors.New("--component and --root are mutually exclusive")
 	}
 
 	cfg, err := config.Load(flags.Config)
@@ -222,7 +230,7 @@ func lastCmd(ctx context.Context, cmd *cli.Command) error {
 func envCmd(ctx context.Context, cmd *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	if flags.Component != "" && flags.Root {
-		return fmt.Errorf("--component and --root are mutually exclusive")
+		return errors.New("--component and --root are mutually exclusive")
 	}
 
 	format := cmd.String("format")
@@ -232,14 +240,14 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 
 	if err != nil || cfgErr != nil {
 		// Not a git repo or no config: populate only var namespace
-		varVars := map[string]interface{}{}
+		varVars := map[string]any{}
 		for k, v := range flags.Vars {
 			varVars[k] = v
 		}
-		vars := map[string]interface{}{
-			"semver": map[string]interface{}{},
-			"git":    map[string]interface{}{},
-			"regex":  map[string]interface{}{},
+		vars := map[string]any{
+			"semver": map[string]any{},
+			"git":    map[string]any{},
+			"regex":  map[string]any{},
 			"var":    varVars,
 		}
 		return printVars(vars, format)
@@ -254,7 +262,7 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 
 	// Warn on stderr if any component has a truncated history (shallow clone)
 	for _, r := range allResults {
-		if gitVars, ok := r.Vars["git"].(map[string]interface{}); ok {
+		if gitVars, ok := r.Vars["git"].(map[string]any); ok {
 			if truncated, ok := gitVars["Truncated"].(bool); ok && truncated {
 				fmt.Fprintln(
 					os.Stderr,
@@ -276,8 +284,8 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 		return printVars(filtered[0].Vars, format)
 	}
 
-	if format == "json" {
-		out := map[string]interface{}{}
+	if format == formatJSON {
+		out := map[string]any{}
 		for _, r := range filtered {
 			out[r.Name] = r.Vars
 		}
@@ -296,7 +304,7 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 			prefix = ""
 		}
 		for _, ns := range []string{"semver", "git", "regex", "var"} {
-			nsVars, ok := r.Vars[ns].(map[string]interface{})
+			nsVars, ok := r.Vars[ns].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -316,7 +324,7 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 func configCmd(ctx context.Context, cmd *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	format := cmd.String("format")
-	if format != "yaml" && format != "json" {
+	if format != "yaml" && format != formatJSON {
 		return fmt.Errorf("unknown format %q: must be yaml or json", format)
 	}
 
@@ -330,7 +338,7 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		out := struct {
 			Source     string                            `json:"_source"`
 			Semver     config.SemverConfig               `json:"semver"`
@@ -340,7 +348,7 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 			Semver:     cfg.Semver,
 			Components: cfg.Components,
 		}
-		b, err := json.MarshalIndent(out, "", "  ")
+		b, err := json.MarshalIndent(out, "", "  ") //nolint:musttag // config structs use yaml tags
 		if err != nil {
 			return fmt.Errorf("marshaling config to JSON: %w", err)
 		}
@@ -365,7 +373,7 @@ func configCmd(ctx context.Context, cmd *cli.Command) error {
 func componentsCmd(ctx context.Context, cmd *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	format := cmd.String("format")
-	if format != "plain" && format != "json" {
+	if format != formatPlain && format != formatJSON {
 		return fmt.Errorf("unknown format %q: must be plain or json", format)
 	}
 
@@ -405,7 +413,7 @@ func componentsCmd(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	if format == "json" {
+	if format == formatJSON {
 		b, err := json.MarshalIndent(infoMap, "", "  ")
 		if err != nil {
 			return fmt.Errorf("marshaling to JSON: %w", err)
@@ -439,7 +447,7 @@ func filterComponentResults(
 ) []semverstrategy.ComponentResult {
 	if flags.Root {
 		for _, r := range results {
-			if r.Name == "@root" || r.Name == "" {
+			if r.Name == rootName || r.Name == "" {
 				return []semverstrategy.ComponentResult{r}
 			}
 		}
@@ -462,7 +470,7 @@ func filterVarsResults(
 ) []semverstrategy.ComponentVarsResult {
 	if flags.Root {
 		for _, r := range results {
-			if r.Name == "@root" || r.Name == "" {
+			if r.Name == rootName || r.Name == "" {
 				return []semverstrategy.ComponentVarsResult{r}
 			}
 		}
@@ -484,7 +492,7 @@ func filterVarsResults(
 // Single result filtered by --component or --root: prints version only.
 // Multiple or named results: prints "name    version" per line (plain) or JSON object.
 func printComponentResults(results []semverstrategy.ComponentResult, format string, flags globalFlags) error {
-	if format != "plain" && format != "json" {
+	if format != formatPlain && format != formatJSON {
 		return fmt.Errorf("unknown format %q: must be plain or json", format)
 	}
 
@@ -496,7 +504,7 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 
 	// Single version: non-monorepo (no name) or filtered by --component/--root
 	if len(filtered) == 1 && (filtered[0].Name == "" || flags.Component != "" || flags.Root) {
-		if format == "json" {
+		if format == formatJSON {
 			b, err := json.Marshal(filtered[0].Version)
 			if err != nil {
 				return fmt.Errorf("marshaling version to JSON: %w", err)
@@ -509,7 +517,7 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 	}
 
 	// Multiple named results (monorepo without filter)
-	if format == "json" {
+	if format == formatJSON {
 		out := make(map[string]string, len(filtered))
 		for _, r := range filtered {
 			out[r.Name] = r.Version
@@ -539,7 +547,7 @@ func printComponentResults(results []semverstrategy.ComponentResult, format stri
 func tagCmd(ctx context.Context, cmd *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	if flags.Component != "" && flags.Root {
-		return fmt.Errorf("--component and --root are mutually exclusive")
+		return errors.New("--component and --root are mutually exclusive")
 	}
 
 	cfg, err := config.Load(flags.Config)
@@ -605,10 +613,10 @@ func tagCmd(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func lintCmd(ctx context.Context, cmd *cli.Command) error {
+func lintCmd(ctx context.Context, _ *cli.Command) error {
 	flags := flagsFromCtx(ctx)
 	if flags.Component != "" && flags.Root {
-		return fmt.Errorf("--component and --root are mutually exclusive")
+		return errors.New("--component and --root are mutually exclusive")
 	}
 
 	cfg, err := config.Load(flags.Config)
@@ -693,7 +701,7 @@ func filterLintResults(
 	}
 	if root {
 		for _, r := range results {
-			if r.Name == "@root" {
+			if r.Name == rootName {
 				return []semverstrategy.ComponentLintResult{r}
 			}
 		}
@@ -718,7 +726,7 @@ func parseVarFlags(rawVars []string) map[string]string {
 // available, then merges with cliVars (CLI wins). Render errors are logged to
 // stderr; the key gets an empty string value.
 func resolveConfigVars(cfgVars map[string]string, cliVars map[string]string) map[string]string {
-	env := map[string]interface{}{}
+	env := map[string]any{}
 	for _, kv := range os.Environ() {
 		parts := strings.SplitN(kv, "=", 2)
 		if len(parts) == 2 {
@@ -727,7 +735,7 @@ func resolveConfigVars(cfgVars map[string]string, cliVars map[string]string) map
 	}
 
 	defaultFn := template.FuncMap{
-		"default": func(def, val interface{}) interface{} {
+		"default": func(def, val any) any {
 			s, _ := val.(string)
 			if s == "" {
 				return def
@@ -737,7 +745,7 @@ func resolveConfigVars(cfgVars map[string]string, cliVars map[string]string) map
 	}
 
 	merged := make(map[string]string, len(cfgVars)+len(cliVars))
-	data := map[string]interface{}{"env": env}
+	data := map[string]any{"env": env}
 	for k, v := range cfgVars {
 		t, err := template.New("").Funcs(defaultFn).Parse(v)
 		if err != nil {
@@ -753,18 +761,16 @@ func resolveConfigVars(cfgVars map[string]string, cliVars map[string]string) map
 		}
 		merged[k] = buf.String()
 	}
-	for k, v := range cliVars {
-		merged[k] = v // CLI always wins
-	}
+	maps.Copy(merged, cliVars) // CLI always wins
 	return merged
 }
 
 // printVars prints vars to stdout in the requested format (plain or json).
-func printVars(vars map[string]interface{}, format string) error {
-	if format != "plain" && format != "json" {
+func printVars(vars map[string]any, format string) error {
+	if format != formatPlain && format != formatJSON {
 		return fmt.Errorf("unknown format %q: must be plain or json", format)
 	}
-	if format == "json" {
+	if format == formatJSON {
 		out, err := json.MarshalIndent(vars, "", "  ")
 		if err != nil {
 			return fmt.Errorf("marshaling vars to JSON: %w", err)
@@ -773,7 +779,7 @@ func printVars(vars map[string]interface{}, format string) error {
 		return nil
 	}
 	for _, ns := range []string{"semver", "git", "regex", "var"} {
-		nsVars, ok := vars[ns].(map[string]interface{})
+		nsVars, ok := vars[ns].(map[string]any)
 		if !ok {
 			continue
 		}

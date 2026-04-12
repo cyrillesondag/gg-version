@@ -164,13 +164,13 @@ func AnalyzeBump(commits []*object.Commit, cfg config.ConventionalCommitsConfig)
 
 		// Classify subject
 		subjectLevel := levelFromPatterns(subject, majorRes, minorRes, patchRes)
-		if subjectLevel >= 0 {
-			// matched a bump pattern — use it
-		} else if formatRe != nil && formatRe.MatchString(subject) {
-			subjectLevel = BumpNone // CC-formatted but unrecognized type → no contribution
-		} else {
-			hasNonCC = true
-			subjectLevel = BumpPatch // non-CC → patch by default
+		if subjectLevel < 0 {
+			if formatRe != nil && formatRe.MatchString(subject) {
+				subjectLevel = BumpNone // CC-formatted but unrecognized type → no contribution
+			} else {
+				hasNonCC = true
+				subjectLevel = BumpPatch // non-CC → patch by default
+			}
 		}
 
 		// Classify footer lines (no format check — just bump patterns)
@@ -182,13 +182,8 @@ func AnalyzeBump(commits []*object.Commit, cfg config.ConventionalCommitsConfig)
 			}
 		}
 
-		commitLevel := subjectLevel
-		if footerLevel > commitLevel {
-			commitLevel = footerLevel
-		}
-		if commitLevel > level {
-			level = commitLevel
-		}
+		commitLevel := max(subjectLevel, footerLevel)
+		level = max(level, commitLevel)
 	}
 	return level, hasNonCC
 }
