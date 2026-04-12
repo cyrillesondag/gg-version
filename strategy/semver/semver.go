@@ -154,8 +154,8 @@ func (s semverStrategy) Last(p GitProject, extra map[string]string) (string, err
 
 // Vars returns all template variables as a nested map, grouped by namespace:
 //   - "semver": Semver, Major, Minor, Patch, PreRelease (CC-calculated),
-//               LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
-//               IsBreakingChange, IsPreRelease, HasNonConventionalCommits
+//     LastVersion, LastMajor, LastMinor, LastPatch, LastPreRelease,
+//     IsBreakingChange, IsPreRelease, HasNonConventionalCommits
 //   - "git":    Branch, AuthorDate, CommitterDate, LastTag, Hash, ShortHash, CommitCount, IsShallow, Truncated
 //   - "regex":  named captures from the matching branch pattern
 //   - "var":    key=value pairs from extra
@@ -168,7 +168,12 @@ func (s semverStrategy) Vars(p GitProject, extra map[string]string) (map[string]
 
 // varsCore is the parameterised implementation of Vars, allowing callers to
 // override the tag prefix and filter configuration (used by component methods).
-func (s semverStrategy) varsCore(p GitProject, extra map[string]string, tagPrefix string, filterCfg FilterConfig) (map[string]interface{}, error) {
+func (s semverStrategy) varsCore(
+	p GitProject,
+	extra map[string]string,
+	tagPrefix string,
+	filterCfg FilterConfig,
+) (map[string]interface{}, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return nil, fmt.Errorf("getting branch name: %w", err)
@@ -425,7 +430,11 @@ func ParseWildcardConstraint(s string) (map[string]string, error) {
 // resolveConstraint renders the branch Constraint template and parses the wildcard result.
 // Only .regex.* and .var.* are available (no .semver.* or .git.*).
 // Returns empty constraints (no filter) if Constraint is empty or on render/parse error.
-func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string, extra map[string]string) map[string]string {
+func resolveConstraint(
+	branchCfg config.BranchConfig,
+	captures map[string]string,
+	extra map[string]string,
+) map[string]string {
 	if branchCfg.Constraint == "" {
 		return map[string]string{}
 	}
@@ -449,7 +458,13 @@ func resolveConstraint(branchCfg config.BranchConfig, captures map[string]string
 	}
 	constraints, err := ParseWildcardConstraint(rendered)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: parsing branch constraint %q (rendered: %q): %v\n", branchCfg.Constraint, rendered, err)
+		fmt.Fprintf(
+			os.Stderr,
+			"warning: parsing branch constraint %q (rendered: %q): %v\n",
+			branchCfg.Constraint,
+			rendered,
+			err,
+		)
 		return map[string]string{}
 	}
 	return constraints

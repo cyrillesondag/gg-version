@@ -2,9 +2,10 @@ package git
 
 import (
 	"fmt"
-	"github.com/cyrillesondag/gg-version/format"
 	"sort"
 	"time"
+
+	"github.com/cyrillesondag/gg-version/format"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"

@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	gosemver "github.com/coreos/go-semver/semver"
 	"github.com/bmatcuk/doublestar/v4"
+	gosemver "github.com/coreos/go-semver/semver"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/cyrillesondag/gg-version/config"
@@ -209,14 +209,14 @@ func BumpVersion(effectiveLastTag, prefix string, level int) string {
 		sv.Major++
 		sv.Minor = 0
 		sv.Patch = 0
-		sv.PreRelease = gosemver.PreRelease("")
+		sv.PreRelease = ""
 	case BumpMinor:
 		sv.Minor++
 		sv.Patch = 0
-		sv.PreRelease = gosemver.PreRelease("")
+		sv.PreRelease = ""
 	case BumpPatch:
 		sv.Patch++
-		sv.PreRelease = gosemver.PreRelease("")
+		sv.PreRelease = ""
 	}
 	return sv.String()
 }

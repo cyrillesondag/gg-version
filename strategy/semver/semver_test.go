@@ -418,8 +418,8 @@ func TestParseWildcardConstraint(t *testing.T) {
 		{"bad", nil, true},
 		{"a.x.x", nil, true},
 		{"1.x", nil, true},
-		{"-1.x.x", nil, true},   // negative integer rejected
-		{"1.2.3.4", nil, true},  // 4 components: "3.4" fails Atoi
+		{"-1.x.x", nil, true},  // negative integer rejected
+		{"1.2.3.4", nil, true}, // 4 components: "3.4" fails Atoi
 	}
 	for _, tc := range cases {
 		got, err := semverstrategy.ParseWildcardConstraint(tc.input)

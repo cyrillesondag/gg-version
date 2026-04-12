@@ -1,12 +1,13 @@
 package git_test
 
 import (
-	gitpkg "github.com/cyrillesondag/gg-version/git"
-	"github.com/cyrillesondag/gg-version/format"
-	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cyrillesondag/gg-version/format"
+	gitpkg "github.com/cyrillesondag/gg-version/git"
+	semverstrategy "github.com/cyrillesondag/gg-version/strategy/semver"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"

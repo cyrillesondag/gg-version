@@ -251,7 +251,11 @@ func (s semverStrategy) varsCoreFromHistory(
 
 // AllCurrent returns current versions for @root and all components.
 // When no components are defined, returns a single result with Name="" (backward compat).
-func (s semverStrategy) AllCurrent(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentResult, error) {
+func (s semverStrategy) AllCurrent(
+	p GitProject,
+	extra map[string]string,
+	cfg config.Config,
+) ([]ComponentResult, error) {
 	if len(cfg.Components) == 0 {
 		filter := FilterConfig{
 			ExcludePaths:  s.cfg.IgnorePaths,
@@ -353,7 +357,11 @@ func (s semverStrategy) AllLast(p GitProject, extra map[string]string, cfg confi
 }
 
 // AllVars returns vars for @root and all components.
-func (s semverStrategy) AllVars(p GitProject, extra map[string]string, cfg config.Config) ([]ComponentVarsResult, error) {
+func (s semverStrategy) AllVars(
+	p GitProject,
+	extra map[string]string,
+	cfg config.Config,
+) ([]ComponentVarsResult, error) {
 	if len(cfg.Components) == 0 {
 		vars, err := s.Vars(p, extra)
 		if err != nil {
@@ -451,7 +459,11 @@ func (s semverStrategy) AllLint(p GitProject, cfg config.Config) ([]ComponentLin
 }
 
 // lintWithPrefix is the non-monorepo variant: uses p.LastTag + p.CommitSinceTag.
-func (s semverStrategy) lintWithPrefix(p GitProject, tagPrefix string, filterCfg FilterConfig) ([]LintResult, bool, error) {
+func (s semverStrategy) lintWithPrefix(
+	p GitProject,
+	tagPrefix string,
+	filterCfg FilterConfig,
+) ([]LintResult, bool, error) {
 	f := NewSemverFormat(tagPrefix, nil)
 	lastTag, err := p.LastTag(f)
 	if err != nil {
@@ -501,7 +513,11 @@ func (s semverStrategy) lintFromHistory(
 
 // currentFromVars derives the current version string from pre-computed vars.
 // Returns (version, tagged, error) where tagged=true means HEAD is exactly on that tag.
-func (s semverStrategy) currentFromVars(p GitProject, vars map[string]interface{}, tagPrefix string) (string, bool, error) {
+func (s semverStrategy) currentFromVars(
+	p GitProject,
+	vars map[string]interface{},
+	tagPrefix string,
+) (string, bool, error) {
 	branchName, err := p.BranchName()
 	if err != nil {
 		return "", false, err

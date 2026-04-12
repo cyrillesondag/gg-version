@@ -223,7 +223,10 @@ semver:
 		t.Errorf("expected constraint %q, got %q", "{{ .regex.major }}.x.x", cfg.Semver.Branches[0].Constraint)
 	}
 	if cfg.Semver.Branches[0].VersionFormat != "" {
-		t.Errorf("expected VersionFormat empty on constrained release branch, got %q", cfg.Semver.Branches[0].VersionFormat)
+		t.Errorf(
+			"expected VersionFormat empty on constrained release branch, got %q",
+			cfg.Semver.Branches[0].VersionFormat,
+		)
 	}
 }
 

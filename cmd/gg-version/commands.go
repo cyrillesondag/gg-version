@@ -256,7 +256,10 @@ func envCmd(ctx context.Context, cmd *cli.Command) error {
 	for _, r := range allResults {
 		if gitVars, ok := r.Vars["git"].(map[string]interface{}); ok {
 			if truncated, ok := gitVars["Truncated"].(bool); ok && truncated {
-				fmt.Fprintln(os.Stderr, "warning: shallow clone — history is truncated, computed version may be underestimated")
+				fmt.Fprintln(
+					os.Stderr,
+					"warning: shallow clone — history is truncated, computed version may be underestimated",
+				)
 				break
 			}
 		}
@@ -430,7 +433,10 @@ func componentsCmd(ctx context.Context, cmd *cli.Command) error {
 }
 
 // filterComponentResults filters results based on globalFlags.
-func filterComponentResults(results []semverstrategy.ComponentResult, flags globalFlags) []semverstrategy.ComponentResult {
+func filterComponentResults(
+	results []semverstrategy.ComponentResult,
+	flags globalFlags,
+) []semverstrategy.ComponentResult {
 	if flags.Root {
 		for _, r := range results {
 			if r.Name == "@root" || r.Name == "" {
@@ -450,7 +456,10 @@ func filterComponentResults(results []semverstrategy.ComponentResult, flags glob
 	return results
 }
 
-func filterVarsResults(results []semverstrategy.ComponentVarsResult, flags globalFlags) []semverstrategy.ComponentVarsResult {
+func filterVarsResults(
+	results []semverstrategy.ComponentVarsResult,
+	flags globalFlags,
+) []semverstrategy.ComponentVarsResult {
 	if flags.Root {
 		for _, r := range results {
 			if r.Name == "@root" || r.Name == "" {
@@ -638,7 +647,10 @@ func lintCmd(ctx context.Context, cmd *cli.Command) error {
 	// Warn if any result is truncated (shallow clone).
 	for _, r := range results {
 		if r.Truncated {
-			fmt.Fprintln(os.Stderr, "warning: shallow clone — commit history is truncated, lint results may be incomplete")
+			fmt.Fprintln(
+				os.Stderr,
+				"warning: shallow clone — commit history is truncated, lint results may be incomplete",
+			)
 			break
 		}
 	}
@@ -662,7 +674,12 @@ func lintCmd(ctx context.Context, cmd *cli.Command) error {
 
 // filterLintResults applies --component / --root to AllLint results.
 // In non-monorepo mode (isMonorepo=false), no filtering is applied.
-func filterLintResults(results []semverstrategy.ComponentLintResult, component string, root bool, isMonorepo bool) []semverstrategy.ComponentLintResult {
+func filterLintResults(
+	results []semverstrategy.ComponentLintResult,
+	component string,
+	root bool,
+	isMonorepo bool,
+) []semverstrategy.ComponentLintResult {
 	if !isMonorepo {
 		return results
 	}

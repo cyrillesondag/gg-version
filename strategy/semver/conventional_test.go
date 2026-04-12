@@ -338,7 +338,11 @@ func TestLintCommits_violations(t *testing.T) {
 		t.Errorf("expected first violation subject %q, got %q", "WIP fix auth", violations[0].Subject)
 	}
 	if violations[1].Subject != "Merge pull request #42 from foo/bar" {
-		t.Errorf("expected second violation subject %q, got %q", "Merge pull request #42 from foo/bar", violations[1].Subject)
+		t.Errorf(
+			"expected second violation subject %q, got %q",
+			"Merge pull request #42 from foo/bar",
+			violations[1].Subject,
+		)
 	}
 	// Hash must be a 7-char hex string
 	if len(violations[0].Hash) != 7 {
